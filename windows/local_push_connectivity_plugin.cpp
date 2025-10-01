@@ -429,16 +429,25 @@ namespace local_push_connectivity {
             const int checkIntervalMs = 100;
             int elapsedMs = 0;
             
+            write_log(L"[Plugin] ", L"Starting to wait for child process...");
+            
             while (elapsedMs < timeoutMs) {
                 // Kiểm tra xem child process đã sẵn sàng chưa
                 PluginSetting settings = gSetting();
                 auto notification_title = utf8_to_wide(settings.title_notification);
+                
+                // Tìm window theo class name (không phải window title)
                 HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
                 
                 if (hwndChild && IsWindow(hwndChild)) {
                     write_log(L"[Plugin] ", L"Child process ready, sending settings");
                     LocalPushConnectivityPlugin::sendSettings();
                     return;
+                }
+                
+                // Thêm logging để debug
+                if (elapsedMs % 1000 == 0) { // Log mỗi giây
+                    write_log(L"[Plugin] ", L"Still waiting for child process...");
                 }
                 
                 // Chờ một chút rồi kiểm tra lại

@@ -98,7 +98,28 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
     cds.cbData = (DWORD)((testMsg.size() + 1) * sizeof(wchar_t));
     cds.lpData = (PVOID)testMsg.c_str();
 
-	HWND hwndParent = FindWindow(utf8_to_wide(param->title).c_str(), NULL); // hoặc read_pid nếu bạn lưu HWND parent
+	// Tìm parent process bằng PID thay vì window title
+	HWND hwndParent = NULL;
+	DWORD parentPid = param->pid;
+	
+	struct EnumData {
+		DWORD targetPid;
+		HWND result;
+	} enumData = { parentPid, NULL };
+	
+	EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
+		EnumData* data = (EnumData*)lParam;
+		DWORD processId;
+		GetWindowThreadProcessId(hwnd, &processId);
+		if (processId == data->targetPid) {
+			data->result = hwnd;
+			return FALSE; // Dừng enum
+		}
+		return TRUE; // Tiếp tục enum
+	}, (LPARAM)&enumData);
+	
+	hwndParent = enumData.result;
+	
     if (hwndParent) {
         SendMessage(hwndParent, WM_COPYDATA, (WPARAM)hwnd, (LPARAM)&cds);
         write_log(L"[Plugin] ", L"sent ready message to parent");
