@@ -20,6 +20,35 @@ void main() async {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      await LocalPushConnectivity.instance.requestPermission();
+      await LocalPushConnectivity.instance.initialize(
+        systemType: 0,
+        windows: WindowsSettingsPigeon(
+          displayName: 'Local Push Sample',
+          bundleId: 'com.hodoan.local_push_connectivity_example',
+          icon: r'assets\favicon.png',
+          iconContent: r'assets\info.svg',
+        ),
+        android: AndroidSettingsPigeon(
+          icon: '@mipmap/ic_launcher',
+          channelNotification:
+              'com.hodoan.local_push_connectivity_example.notification',
+        ),
+        ios: IosSettingsPigeon(ssids: ['TPSSmartoffice']),
+        mode: TCPModePigeon(
+          // host: 'ho-doan.com',
+          host: '10.8.0.2',
+          port: 4040,
+          connectionType: ConnectionType.ws,
+          // wss: false,
+          path: '/ws/',
+        ),
+        // mode: const ConnectModeTCP(
+        //   host: '10.50.80.172',
+        //   port: 4041,
+        // ),
+        // systemType: 77,
+      );
       runApp(const MyApp());
     },
     (e, s) {
@@ -58,53 +87,22 @@ class _MyAppState extends State<MyApp> {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await LocalPushConnectivity.instance.requestPermission();
-        await LocalPushConnectivity.instance.initialize(
-          systemType: 0,
-          windows: WindowsSettingsPigeon(
-            displayName: 'Local Push Sample',
-            bundleId: 'com.hodoan.local_push_connectivity_example',
-            icon: r'assets\favicon.png',
-            iconContent: r'assets\info.svg',
-          ),
-          android: AndroidSettingsPigeon(
-            icon: '@mipmap/ic_launcher',
-            channelNotification:
-                'com.hodoan.local_push_connectivity_example.notification',
-          ),
-          ios: IosSettingsPigeon(ssids: ['TPSSmartoffice']),
-          mode: TCPModePigeon(
-            // host: 'ho-doan.com',
-            host: '10.8.0.2',
-            port: 4040,
-            connectionType: ConnectionType.ws,
-            // wss: false,
-            path: '/ws/',
-          ),
-          // mode: const ConnectModeTCP(
-          //   host: '10.50.80.172',
-          //   port: 4041,
-          // ),
-          // systemType: 77,
-        );
-        _onMessage = LocalPushConnectivity.instance.message.listen((event) {
-          setState(() {
-            messages = event.mrp.mPayload;
-          });
+      _onMessage = LocalPushConnectivity.instance.message.listen((event) {
+        setState(() {
+          messages = event.mrp.mPayload;
         });
-        await LocalPushConnectivity.instance.config(
-          TCPModePigeon(
-            host: '10.8.0.2',
-            port: 4040,
-            connectionType: ConnectionType.ws,
-            path: '/ws/',
-          ),
-        );
-        await LocalPushConnectivity.instance.registerUser(
-          UserPigeon(connectorID: '1234567890', connectorTag: 'test'),
-        );
       });
+      await LocalPushConnectivity.instance.config(
+        TCPModePigeon(
+          host: '10.8.0.2',
+          port: 4040,
+          connectionType: ConnectionType.ws,
+          path: '/ws/',
+        ),
+      );
+      await LocalPushConnectivity.instance.registerUser(
+        UserPigeon(connectorID: '1234567890', connectorTag: 'test'),
+      );
     } catch (e, s) {
       print(e);
       print(s);

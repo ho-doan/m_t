@@ -63,6 +63,9 @@ namespace local_push_connectivity {
             auto cp_struct = reinterpret_cast<COPYDATASTRUCT*>(lparam);
             if (cp_struct->cbData == PONG) {
                 if (_result) {
+                    write_log(L"[Plugin] ", L"Received PONG from child process");
+                    // Gửi settings ngay sau khi nhận được PONG
+                    LocalPushConnectivityPlugin::sendSettings();
                     _result(true);
                     _result = NULL;
                 }
@@ -245,7 +248,9 @@ namespace local_push_connectivity {
                 if (!hwndChild) {
                     auto status = LocalPushConnectivityPlugin::createBackgroundProcess();
                     if (status == -8) {
+                        // Chờ child process khởi tạo xong với timeout
                         _result = result;
+                        LocalPushConnectivityPlugin::waitForChildProcessReady();
                         return;
                     }
                     result(true);
@@ -414,6 +419,53 @@ namespace local_push_connectivity {
         catch (...) {
             write_error();
             return -1;
+        }
+    }
+
+    void LocalPushConnectivityPlugin::waitForChildProcessReady() {
+        try {
+            // Chờ tối đa 10 giây để child process khởi tạo xong
+            const int timeoutMs = 10000;
+            const int checkIntervalMs = 100;
+            int elapsedMs = 0;
+            
+            while (elapsedMs < timeoutMs) {
+                // Kiểm tra xem child process đã sẵn sàng chưa
+                PluginSetting settings = gSetting();
+                auto notification_title = utf8_to_wide(settings.title_notification);
+                HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
+                
+                if (hwndChild && IsWindow(hwndChild)) {
+                    write_log(L"[Plugin] ", L"Child process ready, sending settings");
+                    LocalPushConnectivityPlugin::sendSettings();
+                    return;
+                }
+                
+                // Chờ một chút rồi kiểm tra lại
+                Sleep(checkIntervalMs);
+                elapsedMs += checkIntervalMs;
+            }
+            
+            // Nếu timeout, gửi lỗi về app
+            write_log(L"[Plugin] ", L"Timeout waiting for child process");
+            if (_result) {
+                _result(false);
+                _result = NULL;
+            }
+        }
+        catch (const std::exception& ex) {
+            write_error(ex, 500);
+            if (_result) {
+                _result(false);
+                _result = NULL;
+            }
+        }
+        catch (...) {
+            write_error();
+            if (_result) {
+                _result(false);
+                _result = NULL;
+            }
         }
     }
 }  // namespace local_push_connectivity

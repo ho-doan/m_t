@@ -72,6 +72,7 @@ namespace local_push_connectivity {
         static void sendSettings();
         static int createBackgroundProcess();
         static void sendMessageFromNoti(MessageSystemPigeon m);
+        static void waitForChildProcessReady();
     };
 }  // namespace local_push_connectivity
 
