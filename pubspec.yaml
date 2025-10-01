@@ -1,0 +1,41 @@
+name: local_push_connectivity
+description: "A new Flutter plugin project."
+version: 0.0.1
+homepage:
+
+environment:
+  sdk: ^3.7.0
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  json_annotation: ^4.9.0
+  plugin_platform_interface: ^2.0.2
+  web: ^1.1.1
+  web_socket_channel: ^3.0.3
+
+dev_dependencies:
+  build_runner: ^2.5.4
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  json_serializable: ^6.9.5
+  pigeon: ^26.0.1
+flutter:
+  generate: true
+  plugin:
+    platforms:
+      android:
+        package: com.hodoan.local_push_connectivity
+        pluginClass: LocalPushConnectivityPlugin
+      ios:
+        pluginClass: LocalPushConnectivityPlugin
+      linux:
+        pluginClass: LocalPushConnectivityPlugin
+      macos:
+        pluginClass: LocalPushConnectivityPlugin
+      windows:
+        pluginClass: LocalPushConnectivityPluginCApi
