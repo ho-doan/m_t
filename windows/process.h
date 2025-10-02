@@ -78,6 +78,7 @@ inline constexpr wchar_t NOTIFICATION_SERVICE[] = L"_notification";
 
 static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 	std::unique_ptr<PluginSetting> param(reinterpret_cast<PluginSetting*>(lpParam));
+	write_log(L"[DEBUG] ", L"ThreadFunction started for child process");
 	write_log(L"[Plugin] ", L"create hidden window");
 
 	// copy chuỗi vào list để giữ lifetime
@@ -87,19 +88,24 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 
 	HWND hwnd = createHiddenWindow(GetModuleHandle(NULL), classNameRef);
 	if (hwnd == NULL) {
+		write_log(L"[DEBUG] ", L"Failed to create hidden window");
 		write_log(L"[Plugin] ", L"create hidden failed");
 		return 1;
 	}
+	write_log(L"[DEBUG] ", L"Hidden window created successfully: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwnd)));
 	write_log(L"[Plugin] ", L"created hidden window");
 	write_pid(hwnd);
 
     // Start Named Pipe server for child process
     std::wstring pipeName = GetPipeName(utf8_to_wide(param->title));
+    write_log(L"[DEBUG] ", L"Child process pipe name: " + pipeName);
     g_pipeServer = std::make_unique<NamedPipeServer>(pipeName);
     
     if (g_pipeServer->Start(HandlePipeMessage)) {
+        write_log(L"[DEBUG] ", L"Child Named Pipe server started successfully");
         write_log(L"[Plugin] ", L"Named Pipe server started");
     } else {
+        write_log(L"[DEBUG] ", L"Failed to start child Named Pipe server");
         write_log(L"[Plugin] ", L"Failed to start Named Pipe server");
     }
     
@@ -108,15 +114,20 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
     std::wstring parentPipeName = GetPipeName(utf8_to_wide(param->title));
     NamedPipeClient parentClient(parentPipeName);
     
+    write_log(L"[DEBUG] ", L"Attempting to connect to parent pipe: " + parentPipeName);
     if (parentClient.Connect()) {
+        write_log(L"[DEBUG] ", L"Connected to parent pipe, sending ready message");
         std::string msgUtf8 = wide_to_utf8(testMsg);
         PipeMessage message(PONG, msgUtf8);
         if (parentClient.SendMessage(message)) {
+            write_log(L"[DEBUG] ", L"Ready message sent to parent via Named Pipe");
             write_log(L"[Plugin] ", L"sent ready message to parent via Named Pipe");
         } else {
+            write_log(L"[DEBUG] ", L"Failed to send ready message via Named Pipe");
             write_log(L"[Plugin] ", L"failed to send ready message via Named Pipe");
         }
     } else {
+        write_log(L"[DEBUG] ", L"Failed to connect to parent via Named Pipe");
         write_log(L"[Plugin] ", L"failed to connect to parent via Named Pipe");
         
         // Fallback: try WM_COPYDATA

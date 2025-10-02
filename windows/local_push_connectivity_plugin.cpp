@@ -58,22 +58,33 @@ namespace local_push_connectivity {
     
     // Flag to prevent multiple initialization
     std::atomic<bool> g_initialized{ false };
+    
+    // Counter to prevent infinite process creation
+    std::atomic<int> g_processCreationCount{ 0 };
 
-    LocalPushConnectivityPlugin::LocalPushConnectivityPlugin() {}
+    LocalPushConnectivityPlugin::LocalPushConnectivityPlugin() {
+        write_log(L"[DEBUG] ", L"LocalPushConnectivityPlugin constructor called");
+    }
 
     LocalPushConnectivityPlugin::~LocalPushConnectivityPlugin() {
+        write_log(L"[DEBUG] ", L"LocalPushConnectivityPlugin destructor called");
         // Cleanup when plugin is destroyed
         if (g_parentPipeServer) {
+            write_log(L"[DEBUG] ", L"Stopping parent pipe server");
             g_parentPipeServer->Stop();
             g_parentPipeServer.reset();
         }
         g_initialized.store(false);
         g_creatingProcess.store(false);
+        g_processCreationCount.store(0);
         write_log(L"[Plugin] ", L"Plugin destroyed, cleaned up resources");
+        write_log(L"[DEBUG] ", L"Plugin cleanup completed");
     }
     int LocalPushConnectivityPlugin::RegisterProcess(std::wstring title,
         _In_ wchar_t* command_line) {
+        write_log(L"[DEBUG] ", L"RegisterProcess called with title: " + title);
         MyProcess p(title, command_line);
+        write_log(L"[DEBUG] ", L"RegisterProcess returning mode: " + std::to_wstring(p.mode));
         return p.mode;
     }
 
@@ -278,13 +289,18 @@ namespace local_push_connectivity {
         const TCPModePigeon& mode,
         std::function<void(ErrorOr<bool> reply)> result) {
         try {
+            write_log(L"[DEBUG] ", L"Initialize called with system_type: " + std::to_wstring(system_type));
+            write_log(L"[DEBUG] ", L"g_initialized.load(): " + std::to_wstring(g_initialized.load()));
+            
             // Check if already initialized
             if (g_initialized.load()) {
+                write_log(L"[DEBUG] ", L"Already initialized, skipping");
                 write_log(L"[Plugin] ", L"Already initialized, skipping");
                 result(true);
                 return;
             }
             
+            write_log(L"[DEBUG] ", L"Starting initialization...");
             write_log(L"[Plugin] ", L"Starting initialization...");
             //result(FlutterError("NNN", "detail"));
             std::string public_has_key = "-";
@@ -324,15 +340,20 @@ namespace local_push_connectivity {
                 
                 // Start Named Pipe server for parent process (only if not already started)
                 if (!g_parentPipeServer) {
+                    write_log(L"[DEBUG] ", L"Creating new Named Pipe server");
                     std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+                    write_log(L"[DEBUG] ", L"Pipe name: " + pipeName);
                     g_parentPipeServer = std::make_unique<NamedPipeServer>(pipeName);
                     
                     if (g_parentPipeServer->Start(HandleParentPipeMessage)) {
+                        write_log(L"[DEBUG] ", L"Parent Named Pipe server started successfully");
                         write_log(L"[Plugin] ", L"Parent Named Pipe server started");
                     } else {
+                        write_log(L"[DEBUG] ", L"Failed to start Parent Named Pipe server");
                         write_log(L"[Plugin] ", L"Failed to start Parent Named Pipe server");
                     }
                 } else {
+                    write_log(L"[DEBUG] ", L"Parent Named Pipe server already running");
                     write_log(L"[Plugin] ", L"Parent Named Pipe server already running");
                 }
 
@@ -349,19 +370,40 @@ namespace local_push_connectivity {
 
                         sendMessageFromNoti(m);
                     });
+                write_log(L"[DEBUG] ", L"Looking for child process window: " + notification_title);
                 HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
+                write_log(L"[DEBUG] ", L"hwndChild: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwndChild)));
+                
                 if (!hwndChild) {
+                    write_log(L"[DEBUG] ", L"No child process found");
+                    write_log(L"[DEBUG] ", L"g_creatingProcess.load(): " + std::to_wstring(g_creatingProcess.load()));
+                    
+                    // Check process creation counter
+                    int currentCount = g_processCreationCount.load();
+                    write_log(L"[DEBUG] ", L"Process creation count: " + std::to_wstring(currentCount) + L" $cout");
+                    
+                    if (currentCount >= 10) {
+                        write_log(L"[ERROR] ", L"Maximum process creation limit reached (10), throwing error $cout");
+                        throw std::runtime_error("Maximum process creation limit reached (10)");
+                    }
+                    
                     // Check if we're already creating a process
                     if (g_creatingProcess.load()) {
+                        write_log(L"[DEBUG] ", L"Process creation already in progress, skipping");
                         write_log(L"[Plugin] ", L"Process creation already in progress, skipping");
                         result(true);
                         return;
                     }
                     
+                    write_log(L"[DEBUG] ", L"Creating new child process...");
                     write_log(L"[Plugin] ", L"No child process found, creating new one");
                     g_creatingProcess.store(true);
+                    g_processCreationCount.fetch_add(1);
                     auto status = LocalPushConnectivityPlugin::createBackgroundProcess();
+                    write_log(L"[DEBUG] ", L"createBackgroundProcess returned: " + std::to_wstring(status));
+                    
                     if (status == -8) {
+                        write_log(L"[DEBUG] ", L"Waiting for child process to be ready...");
                         // Chờ child process khởi tạo xong với timeout
                         _result = result;
                         LocalPushConnectivityPlugin::waitForChildProcessReady();
@@ -373,8 +415,11 @@ namespace local_push_connectivity {
                     return;
                 }
                 else {
+                    write_log(L"[DEBUG] ", L"Child process already exists, sending settings");
                     write_log(L"[Plugin] ", L"Child process already exists, sending settings");
                     LocalPushConnectivityPlugin::sendSettings();
+                    // Reset counter when child process exists
+                    g_processCreationCount.store(0);
                 }
 
                 g_initialized.store(true);
@@ -386,12 +431,16 @@ namespace local_push_connectivity {
         }
         catch (const std::exception& ex) {
             write_error(ex, 475);
+            write_log(L"[ERROR] ", L"Exception in Initialize: " + utf8_to_wide(ex.what()) + L" $cout");
             g_initialized.store(false);
+            g_processCreationCount.store(0);
             result(false);
         }
         catch (...) {
             write_error();
+            write_log(L"[ERROR] ", L"Unknown exception in Initialize $cout");
             g_initialized.store(false);
+            g_processCreationCount.store(0);
             result(false);
         }
     }
@@ -517,16 +566,22 @@ namespace local_push_connectivity {
 
     int LocalPushConnectivityPlugin::createBackgroundProcess() {
         try {
+            write_log(L"[DEBUG] ", L"createBackgroundProcess called $cout");
             auto oldPid = read_pid();
+            write_log(L"[DEBUG] ", L"oldPid: " + std::to_wstring(reinterpret_cast<uintptr_t>(oldPid)));
+            
             if (oldPid && IsWindow(oldPid)) {
+                write_log(L"[DEBUG] ", L"Old process still exists, killing it first");
                 write_log(L"[Plugin] ", L"Old process still exists, killing it first");
                 // Kill old process
                 DWORD processId;
                 GetWindowThreadProcessId(oldPid, &processId);
+                write_log(L"[DEBUG] ", L"Killing process ID: " + std::to_wstring(processId));
                 HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, processId);
                 if (hProcess) {
                     TerminateProcess(hProcess, 0);
                     CloseHandle(hProcess);
+                    write_log(L"[DEBUG] ", L"Old process terminated");
                     write_log(L"[Plugin] ", L"Old process terminated");
                     // Wait a bit for cleanup
                     Sleep(1000);
@@ -549,9 +604,11 @@ namespace local_push_connectivity {
             std::wstring wideSettings = utf8_to_wide(m_settings);
             std::wstring commandLine = L"\"" + std::wstring(execuablePath) + L"\" child \"" + wideSettings + L"\"";
 
+            write_log(L"[DEBUG] ", L"Creating process with command: " + commandLine + L" $cout");
             std::wcout << "exe service notification: " << commandLine << L"\n";
             if (CreateProcess(NULL, commandLine.data(), NULL, NULL,
                 FALSE, 0, NULL, NULL, &si, &pi)) {
+                write_log(L"[DEBUG] ", L"Process created successfully with PID: " + std::to_wstring(pi.dwProcessId) + L" $cout");
                 std::wcout << L"create process ok";
 
                 auto noti_title = utf8_to_wide(settings.title_notification);
@@ -561,7 +618,9 @@ namespace local_push_connectivity {
                 return -8;
             }
             else {
-                std::wcerr << L"create process error" << GetLastError() << std::endl;
+                DWORD error = GetLastError();
+                write_log(L"[DEBUG] ", L"CreateProcess failed with error: " + std::to_wstring(error));
+                std::wcerr << L"create process error" << error << std::endl;
             }
             return -1;
         }
@@ -577,24 +636,31 @@ namespace local_push_connectivity {
 
     void LocalPushConnectivityPlugin::waitForChildProcessReady() {
         try {
+            write_log(L"[DEBUG] ", L"waitForChildProcessReady called");
             // Chờ tối đa 10 giây để child process khởi tạo xong
             const int timeoutMs = 10000;
             const int checkIntervalMs = 100;
             int elapsedMs = 0;
             
+            write_log(L"[DEBUG] ", L"Starting to wait for child process...");
             write_log(L"[Plugin] ", L"Starting to wait for child process...");
             
             while (elapsedMs < timeoutMs) {
+                write_log(L"[DEBUG] ", L"Checking for child process, elapsed: " + std::to_wstring(elapsedMs) + L"ms");
                 // Kiểm tra xem child process đã sẵn sàng chưa
                 PluginSetting settings = gSetting();
                 auto notification_title = utf8_to_wide(settings.title_notification);
                 
                 // Tìm window theo class name (không phải window title)
                 HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
+                write_log(L"[DEBUG] ", L"Found window: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwndChild)));
                 
                 if (hwndChild && IsWindow(hwndChild)) {
+                    write_log(L"[DEBUG] ", L"Child process ready, sending settings $cout");
                     write_log(L"[Plugin] ", L"Child process ready, sending settings");
                     LocalPushConnectivityPlugin::sendSettings();
+                    // Reset counter when child process is ready
+                    g_processCreationCount.store(0);
                     return;
                 }
                 
