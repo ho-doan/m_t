@@ -45,18 +45,9 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 	write_log(L"[Plugin] ", L"Named Pipe mode - skipping hidden window");
 	write_pid(hwnd); // Still save PID for WM_COPYDATA fallback
 
-    // Start Named Pipe server for child process (different pipe name)
-    std::wstring childPipeName = GetPipeName(utf8_to_wide(param->title)) + L"_child";
-    write_log(L"[DEBUG] ", (L"Child process pipe name: " + childPipeName).c_str());
-    g_pipeServer = std::make_unique<NamedPipeServer>(childPipeName);
-    
-    if (g_pipeServer->Start(HandlePipeMessage)) {
-        write_log(L"[DEBUG] ", L"Child Named Pipe server started successfully");
-        write_log(L"[Plugin] ", L"Named Pipe server started");
-    } else {
-        write_log(L"[DEBUG] ", L"Failed to start child Named Pipe server");
-        write_log(L"[Plugin] ", L"Failed to start Named Pipe server");
-    }
+    // Child process does not need Named Pipe server
+    // It only connects to parent pipe to send PONG
+    write_log(L"[DEBUG] ", L"Child process - no Named Pipe server needed");
     
     // Send "child ready" message to parent via Named Pipe
     std::wstring testMsg = L"child ready";
