@@ -100,7 +100,7 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 
 	// Tìm parent process bằng PID thay vì window title
 	HWND hwndParent = NULL;
-	DWORD parentPid = param->pid;
+	DWORD parentPid = param->appPid;
 	
 	struct EnumData {
 		DWORD targetPid;
