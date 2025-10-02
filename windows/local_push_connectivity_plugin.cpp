@@ -106,8 +106,9 @@ namespace local_push_connectivity {
             }
             case PIPE_CMD_UPDATE_SETTINGS: {
                 write_log(L"[Plugin] ", L"Received UPDATE_SETTINGS command from child via Named Pipe");
-                // This is a settings update request from child, don't send settings back
-                // Just acknowledge receipt
+                // This should not happen - parent should not receive UPDATE_SETTINGS from child
+                // Child should only send PONG, not UPDATE_SETTINGS
+                write_log(L"[Plugin] ", L"WARNING: Child sent UPDATE_SETTINGS to parent - this is unexpected");
                 break;
             }
             case 1: { // Message from child
