@@ -104,6 +104,11 @@ namespace local_push_connectivity {
                 }
                 break;
             }
+            case PIPE_CMD_UPDATE_SETTINGS: {
+                write_log(L"[Plugin] ", L"Received UPDATE_SETTINGS command from child via Named Pipe");
+                // This is a settings update request, handle it
+                break;
+            }
             case 1: { // Message from child
                 if (LocalPushConnectivityPlugin::_flutterApi) {
                     NotificationPigeon n = NotificationPigeon("n", "n");
@@ -189,14 +194,26 @@ namespace local_push_connectivity {
             std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
             NamedPipeClient client(pipeName);
             
-            if (client.Connect()) {
-                PipeMessage message(CMD_UPDATE_SETTINGS, commandLine);
+            // Try to connect with timeout to avoid blocking
+            bool connected = false;
+            for (int i = 0; i < 3; i++) {
+                if (client.Connect()) {
+                    connected = true;
+                    break;
+                }
+                Sleep(50); // Wait 50ms before retry
+            }
+            
+            if (connected) {
+                PipeMessage message(PIPE_CMD_UPDATE_SETTINGS, commandLine);
                 if (client.SendMessage(message)) {
                     write_log(L"[SETTINGS] ", L"Sent via Named Pipe");
+                    client.Disconnect();
                     return;
                 } else {
                     write_log(L"[SETTINGS] ", L"Failed to send via Named Pipe");
                 }
+                client.Disconnect();
             } else {
                 write_log(L"[SETTINGS] ", L"Failed to connect via Named Pipe");
             }
