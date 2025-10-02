@@ -38,11 +38,6 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 	write_log(L"[DEBUG] ", L"ThreadFunction started for child process");
 	write_log(L"[Plugin] ", L"create hidden window");
 
-	// copy chuỗi vào list để giữ lifetime
-	std::wstring notification_title_ = utf8_to_wide(param->title_notification);
-	g_registeredClasses.push_back(notification_title_);
-	const std::wstring& classNameRef = g_registeredClasses.back();
-
 	// No need for hidden window with Named Pipe communication
 	// Just create a dummy HWND for PID tracking (backward compatibility)
 	HWND hwnd = (HWND)0x12345678; // Dummy handle for compatibility
