@@ -59,7 +59,7 @@ void NamedPipeServer::ServerLoop() {
             continue;
         }
         
-        write_log(L"[NamedPipe] Server waiting for client connection");
+        write_log(L"[NamedPipe] Server waiting for client connection", L"");
         
         // Wait for client connection
         BOOL connected = ConnectNamedPipe(hPipe, NULL);
@@ -68,7 +68,7 @@ void NamedPipeServer::ServerLoop() {
             if (error == ERROR_PIPE_CONNECTED) {
                 write_log(L"[NamedPipe] Client already connected");
             } else {
-                write_log(L"[NamedPipe] ConnectNamedPipe failed: ", std::to_wstring(error));
+                write_log(L"[NamedPipe] ConnectNamedPipe failed: ", std::to_wstring(error).c_str());
                 ClosePipe();
                 Sleep(1000);
                 continue;
@@ -86,7 +86,7 @@ void NamedPipeServer::ServerLoop() {
                     write_log(L"[NamedPipe] Client disconnected");
                     break;
                 }
-                write_log(L"[NamedPipe] ReadPipeMessage failed: ", std::to_wstring(error));
+                write_log(L"[NamedPipe] ReadPipeMessage failed: ", std::to_wstring(error).c_str());
                 break;
             }
             
@@ -123,7 +123,7 @@ bool NamedPipeServer::CreatePipe() {
     
     if (hPipe == INVALID_HANDLE_VALUE) {
         DWORD error = GetLastError();
-        write_log(L"[NamedPipe] CreateNamedPipe failed: ", std::to_wstring(error));
+        write_log(L"[NamedPipe] CreateNamedPipe failed: ", std::to_wstring(error).c_str());
         return false;
     }
     
@@ -180,7 +180,7 @@ bool NamedPipeClient::Connect() {
             Sleep(100);
             retryCount++;
         } else {
-            write_log(L"[NamedPipe] CreateFile failed: ", std::to_wstring(error));
+            write_log(L"[NamedPipe] CreateFile failed: ", std::to_wstring(error).c_str());
             break;
         }
     }
@@ -205,7 +205,7 @@ bool NamedPipeClient::SendMessage(const PipeMessage& message) {
 }
 
 bool NamedPipeClient::IsConnected() const {
-    std::lock_guard<std::mutex> lock(pipeMutex);
+    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(pipeMutex));
     return hPipe != INVALID_HANDLE_VALUE;
 }
 

@@ -50,6 +50,7 @@ namespace local_push_connectivity {
             const UserPigeon& user,
             std::function<void(ErrorOr<bool> reply)> result) override;
         void DeviceID(std::function<void(ErrorOr<std::string> reply)> result) override;
+        static void sendSettings();
     private:
         static bool _flutterApiReady;
         static std::optional<MessageSystemPigeon> _m;
@@ -69,7 +70,6 @@ namespace local_push_connectivity {
         }
         static std::unique_ptr<LocalPushConnectivityPigeonFlutterApi> _flutterApi;
         static void startThreadInChildProcess();
-        static void sendSettings();
         static int createBackgroundProcess();
         static void sendMessageFromNoti(MessageSystemPigeon m);
         static void waitForChildProcessReady();

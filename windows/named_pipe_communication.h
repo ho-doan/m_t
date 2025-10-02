@@ -23,7 +23,7 @@ struct PipeMessage {
     std::string data;
     
     PipeMessage() : command(0), dataSize(0) {}
-    PipeMessage(DWORD cmd, const std::string& msg) : command(cmd), data(msg), dataSize(msg.length()) {}
+    PipeMessage(DWORD cmd, const std::string& msg) : command(cmd), data(msg), dataSize(static_cast<DWORD>(msg.length())) {}
 };
 
 class NamedPipeServer {

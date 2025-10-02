@@ -112,12 +112,12 @@ struct WebSocketControl
     void _reveive(std::wstring msg) {
         // Try to send message to parent process via Named Pipe
         std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
-        NamedPipeClient client(pipeName);
+        NamedPipeClient pipeClient(pipeName);
         
-        if (client.Connect()) {
+        if (pipeClient.Connect()) {
             std::string msgUtf8 = wide_to_utf8(msg);
             PipeMessage message(1, msgUtf8); // Command 1 for message
-            if (client.SendMessage(message)) {
+            if (pipeClient.SendMessage(message)) {
                 write_log(L"[App Actived]", msg);
                 return;
             }
@@ -320,7 +320,7 @@ inline void HandlePipeMessage(const PipeMessage& message) {
     try {
         switch (message.command) {
         case CMD_UPDATE_SETTINGS: {
-            write_log(L"[Service] receive settings: ", utf8_to_wide(message.data));
+            write_log(L"[Service] receive settings: ", utf8_to_wide(message.data).c_str());
             
             auto settings = pluginSettingsFromJson(message.data);
             if (m_control) {

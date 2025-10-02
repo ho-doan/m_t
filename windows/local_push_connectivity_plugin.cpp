@@ -76,11 +76,11 @@ namespace local_push_connectivity {
                 break;
             }
             case 1: { // Message from child
-                if (_flutterApi) {
+                if (LocalPushConnectivityPlugin::_flutterApi) {
                     NotificationPigeon n = NotificationPigeon("n", "n");
                     MessageResponsePigeon mR = MessageResponsePigeon(n, message.data);
                     MessageSystemPigeon m = MessageSystemPigeon(false, mR);
-                    _flutterApi->OnMessage(m,
+                    LocalPushConnectivityPlugin::_flutterApi->OnMessage(m,
                         []() {
                             std::cout << "Message sent ok";
                         },
