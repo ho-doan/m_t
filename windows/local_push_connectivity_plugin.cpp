@@ -219,11 +219,24 @@ namespace local_push_connectivity {
                 write_log(L"[SETTINGS] ", L"Failed to connect via Named Pipe");
             }
             
-            // Fallback to WM_COPYDATA
-            HWND hwndChild = read_pid();
+            // Fallback to WM_COPYDATA (only if Named Pipe fails)
+            write_log(L"[SETTINGS] ", L"Named Pipe failed, trying WM_COPYDATA fallback...");
+            
+            // Try to read PID with retry (child process might not have saved PID yet)
+            HWND hwndChild = NULL;
+            for (int i = 0; i < 5; i++) {
+                hwndChild = read_pid();
+                if (hwndChild) {
+                    write_log(L"[SETTINGS] ", L"Found child process PID");
+                    break;
+                }
+                write_log(L"[SETTINGS] ", L"Waiting for child process to save PID...");
+                Sleep(200); // Wait 200ms for child to save PID
+            }
+            
             if (!hwndChild) {
-                write_log(L"[ERROR SETTINGS] ", L"Process null");
-                MessageBoxA(NULL, commandLine.c_str(), "Child exe notification is null", MB_OK);
+                write_log(L"[ERROR SETTINGS] ", L"Process null - child process not found after retries");
+                write_log(L"[ERROR SETTINGS] ", L"Please check if child process is running");
                 return;
             }
             if (!IsWindow(hwndChild)) {
