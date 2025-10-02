@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:local_push_connectivity/local_push_connectivity.dart';
+import 'timer_app.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -68,6 +69,11 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String messages = '';
+  int _selectedIndex = 0;
+
+  // Pages
+  final List<Widget> _pages = [const MainPage(), const TimerApp()];
+
   @override
   void initState() {
     super.initState();
@@ -114,24 +120,71 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(title: const Text('Plugin example app')),
-        body: Center(child: Text('Running: $messages')),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            if (Platform.isWindows) {
-              LocalPushConnectivity.instance.config(
-                TCPModePigeon(
-                  host: '10.8.0.2',
-                  port: 4040,
-                  connectionType: ConnectionType.ws,
-                  path: '/ws/',
-                ),
-              );
-            }
-            // LocalPushConnectivity.instance.stop();
-          },
-          child: const Icon(Icons.send),
+        appBar: AppBar(
+          title: const Text('Plugin example app'),
+          backgroundColor: Colors.blue,
         ),
+        body: _pages[_selectedIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Main'),
+            BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'Timer'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MainPage extends StatelessWidget {
+  const MainPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.home, size: 100, color: Colors.blue),
+          SizedBox(height: 20),
+          Text(
+            'Local Push Connectivity',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Main Page',
+            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+          ),
+          SizedBox(height: 30),
+          ElevatedButton.icon(
+            onPressed: () {
+              if (Platform.isWindows) {
+                LocalPushConnectivity.instance.config(
+                  TCPModePigeon(
+                    host: '10.8.0.2',
+                    port: 4040,
+                    connectionType: ConnectionType.ws,
+                    path: '/ws/',
+                  ),
+                );
+              }
+            },
+            icon: Icon(Icons.send),
+            label: Text('Send Config'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            ),
+          ),
+        ],
       ),
     );
   }
