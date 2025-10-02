@@ -70,7 +70,7 @@ namespace local_push_connectivity {
             _settings = settings;
         }
         static void startThreadInChildProcess();
-        static int createBackgroundProcess();
+        static int createBackgroundProcess(int counter = 0);
         static void sendMessageFromNoti(MessageSystemPigeon m);
         static void waitForChildProcessReady();
     };
