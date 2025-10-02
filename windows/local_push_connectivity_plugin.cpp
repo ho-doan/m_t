@@ -46,7 +46,16 @@ namespace local_push_connectivity {
 
     LocalPushConnectivityPlugin::LocalPushConnectivityPlugin() {}
 
-    LocalPushConnectivityPlugin::~LocalPushConnectivityPlugin() {}
+    LocalPushConnectivityPlugin::~LocalPushConnectivityPlugin() {
+        // Cleanup when plugin is destroyed
+        if (g_parentPipeServer) {
+            g_parentPipeServer->Stop();
+            g_parentPipeServer.reset();
+        }
+        g_initialized.store(false);
+        g_creatingProcess.store(false);
+        write_log(L"[Plugin] ", L"Plugin destroyed, cleaned up resources");
+    }
     std::unique_ptr<LocalPushConnectivityPigeonFlutterApi> LocalPushConnectivityPlugin::_flutterApi = NULL;
     std::wstring LocalPushConnectivityPlugin::_title = L"";
     bool LocalPushConnectivityPlugin::_flutterApiReady = false;
@@ -57,6 +66,9 @@ namespace local_push_connectivity {
     
     // Flag to prevent multiple process creation
     std::atomic<bool> g_creatingProcess{ false };
+    
+    // Flag to prevent multiple initialization
+    std::atomic<bool> g_initialized{ false };
     int LocalPushConnectivityPlugin::RegisterProcess(std::wstring title,
         _In_ wchar_t* command_line) {
         MyProcess p(title, command_line);
@@ -264,6 +276,14 @@ namespace local_push_connectivity {
         const TCPModePigeon& mode,
         std::function<void(ErrorOr<bool> reply)> result) {
         try {
+            // Check if already initialized
+            if (g_initialized.load()) {
+                write_log(L"[Plugin] ", L"Already initialized, skipping");
+                result(true);
+                return;
+            }
+            
+            write_log(L"[Plugin] ", L"Starting initialization...");
             //result(FlutterError("NNN", "detail"));
             std::string public_has_key = "-";
             std::string path = "-";
@@ -300,14 +320,18 @@ namespace local_push_connectivity {
                 auto notification_title = utf8_to_wide(settings.title_notification);
                 LocalPushConnectivityPlugin::saveSetting(settings);
                 
-                // Start Named Pipe server for parent process
-                std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
-                g_parentPipeServer = std::make_unique<NamedPipeServer>(pipeName);
-                
-                if (g_parentPipeServer->Start(HandleParentPipeMessage)) {
-                    write_log(L"[Plugin] ", L"Parent Named Pipe server started");
+                // Start Named Pipe server for parent process (only if not already started)
+                if (!g_parentPipeServer) {
+                    std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+                    g_parentPipeServer = std::make_unique<NamedPipeServer>(pipeName);
+                    
+                    if (g_parentPipeServer->Start(HandleParentPipeMessage)) {
+                        write_log(L"[Plugin] ", L"Parent Named Pipe server started");
+                    } else {
+                        write_log(L"[Plugin] ", L"Failed to start Parent Named Pipe server");
+                    }
                 } else {
-                    write_log(L"[Plugin] ", L"Failed to start Parent Named Pipe server");
+                    write_log(L"[Plugin] ", L"Parent Named Pipe server already running");
                 }
 
                 DesktopNotificationManagerCompat::OnActivated([this](
@@ -351,6 +375,7 @@ namespace local_push_connectivity {
                     LocalPushConnectivityPlugin::sendSettings();
                 }
 
+                g_initialized.store(true);
                 result(true);
             }
             else {
@@ -359,10 +384,12 @@ namespace local_push_connectivity {
         }
         catch (const std::exception& ex) {
             write_error(ex, 475);
+            g_initialized.store(false);
             result(false);
         }
         catch (...) {
             write_error();
+            g_initialized.store(false);
             result(false);
         }
     }
