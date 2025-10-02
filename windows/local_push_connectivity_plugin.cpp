@@ -17,6 +17,7 @@
 #include "win_toast.h"
 #include "utils.h"
 #include "process.h"
+#include "named_pipe_communication.h"
 
 #include <cstdlib>
 
@@ -49,6 +50,9 @@ namespace local_push_connectivity {
     std::wstring LocalPushConnectivityPlugin::_title = L"";
     bool LocalPushConnectivityPlugin::_flutterApiReady = false;
     std::wstring LocalPushConnectivityPlugin::_title_notification = L"";
+    
+    // Global Named Pipe server for parent process
+    std::unique_ptr<NamedPipeServer> g_parentPipeServer;
     int LocalPushConnectivityPlugin::RegisterProcess(std::wstring title,
         _In_ wchar_t* command_line) {
         MyProcess p(title, command_line);
@@ -56,6 +60,49 @@ namespace local_push_connectivity {
     }
 
     std::function<void(ErrorOr<bool> reply)> _result = NULL;
+    
+    // Message handler for parent process Named Pipe
+    void HandleParentPipeMessage(const PipeMessage& message) {
+        try {
+            switch (message.command) {
+            case PONG: {
+                if (_result) {
+                    write_log(L"[Plugin] ", L"Received PONG from child process via Named Pipe");
+                    // Gửi settings ngay sau khi nhận được PONG
+                    LocalPushConnectivityPlugin::sendSettings();
+                    _result(true);
+                    _result = NULL;
+                }
+                break;
+            }
+            case 1: { // Message from child
+                if (_flutterApi) {
+                    NotificationPigeon n = NotificationPigeon("n", "n");
+                    MessageResponsePigeon mR = MessageResponsePigeon(n, message.data);
+                    MessageSystemPigeon m = MessageSystemPigeon(false, mR);
+                    _flutterApi->OnMessage(m,
+                        []() {
+                            std::cout << "Message sent ok";
+                        },
+                        [](const FlutterError& e) {
+                            std::cout << "Message send error: " << e.code()
+                                << " - " << e.message();
+                        });
+                }
+                break;
+            }
+            default:
+                write_log(L"[Plugin] ", L"Unknown command from child: " + std::to_wstring(message.command));
+                break;
+            }
+        }
+        catch (const std::exception& ex) {
+            write_error(ex, 1003);
+        }
+        catch (...) {
+            write_error();
+        }
+    }
 
     void LocalPushConnectivityPlugin::HandleMessage(HWND window, UINT const message,
         LPARAM const lparam) {
@@ -63,7 +110,7 @@ namespace local_push_connectivity {
             auto cp_struct = reinterpret_cast<COPYDATASTRUCT*>(lparam);
             if (cp_struct->cbData == PONG) {
                 if (_result) {
-                    write_log(L"[Plugin] ", L"Received PONG from child process");
+                    write_log(L"[Plugin] ", L"Received PONG from child process via WM_COPYDATA");
                     // Gửi settings ngay sau khi nhận được PONG
                     LocalPushConnectivityPlugin::sendSettings();
                     _result(true);
@@ -108,6 +155,24 @@ namespace local_push_connectivity {
         try {
             PluginSetting settings = gSetting();
             std::string commandLine = pluginSettingsToJson(settings);
+            
+            // Try Named Pipe first
+            std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+            NamedPipeClient client(pipeName);
+            
+            if (client.Connect()) {
+                PipeMessage message(CMD_UPDATE_SETTINGS, commandLine);
+                if (client.SendMessage(message)) {
+                    write_log(L"[SETTINGS] ", L"Sent via Named Pipe");
+                    return;
+                } else {
+                    write_log(L"[SETTINGS] ", L"Failed to send via Named Pipe");
+                }
+            } else {
+                write_log(L"[SETTINGS] ", L"Failed to connect via Named Pipe");
+            }
+            
+            // Fallback to WM_COPYDATA
             HWND hwndChild = read_pid();
             if (!hwndChild) {
                 write_log(L"[ERROR SETTINGS] ", L"Process null");
@@ -123,14 +188,14 @@ namespace local_push_connectivity {
             cds.dwData = 100;
             cds.cbData = (DWORD)(wcslen(c.c_str()) + 1) * sizeof(wchar_t);
             cds.lpData = (PVOID)c.c_str();
-            write_log(L"[SETTINGS] ", L"Sending...");
+            write_log(L"[SETTINGS] ", L"Sending via WM_COPYDATA...");
             DWORD_PTR result;
             LRESULT res = SendMessageTimeoutW(hwndChild, WM_COPYDATA, (WPARAM)GetCurrentProcessId(),
                 (LPARAM)&cds, SMTO_NORMAL, 5000, &result);
             if (res == 0) {
                 write_log(L"[SETTINGS] ", L"Send timeout...");
             }
-            write_log(L"[SETTINGS] ", L"Sended...");
+            write_log(L"[SETTINGS] ", L"Sended via WM_COPYDATA...");
         }
         catch (const std::exception& ex) {
             write_error(ex, 253);
@@ -230,6 +295,16 @@ namespace local_push_connectivity {
                 settings.iconPath = wide_to_utf8(pathIcon);
                 auto notification_title = utf8_to_wide(settings.title_notification);
                 LocalPushConnectivityPlugin::saveSetting(settings);
+                
+                // Start Named Pipe server for parent process
+                std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+                g_parentPipeServer = std::make_unique<NamedPipeServer>(pipeName);
+                
+                if (g_parentPipeServer->Start(HandleParentPipeMessage)) {
+                    write_log(L"[Plugin] ", L"Parent Named Pipe server started");
+                } else {
+                    write_log(L"[Plugin] ", L"Failed to start Parent Named Pipe server");
+                }
 
                 DesktopNotificationManagerCompat::OnActivated([this](
                     DesktopNotificationActivatedEventArgsCompat data) {
@@ -351,6 +426,27 @@ namespace local_push_connectivity {
 
     void LocalPushConnectivityPlugin::Stop(std::function<void(ErrorOr<bool> reply)> result) {
         try {
+            PluginSetting settings = gSetting();
+            std::string logoutMsg = "logout";
+            
+            // Try Named Pipe first
+            std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+            NamedPipeClient client(pipeName);
+            
+            if (client.Connect()) {
+                PipeMessage message(CMD_STOP_SERVICE, logoutMsg);
+                if (client.SendMessage(message)) {
+                    write_log(L"[STOP] ", L"Sent via Named Pipe");
+                    result(true);
+                    return;
+                } else {
+                    write_log(L"[STOP] ", L"Failed to send via Named Pipe");
+                }
+            } else {
+                write_log(L"[STOP] ", L"Failed to connect via Named Pipe");
+            }
+            
+            // Fallback to WM_COPYDATA
             std::wstring c(L"logout");
             COPYDATASTRUCT cds;
             cds.dwData = 99;
@@ -363,6 +459,7 @@ namespace local_push_connectivity {
             }
             SendMessageW(hwndChild, WM_COPYDATA, (WPARAM)GetCurrentProcessId(),
                 (LPARAM)&cds);
+            write_log(L"[STOP] ", L"Sent via WM_COPYDATA");
             result(true);
         }
         catch (...) {

@@ -2,6 +2,7 @@
 
 #include "model.h"
 #include "socket_control.h"
+#include "named_pipe_communication.h"
 
 #include <utility>
 
@@ -92,39 +93,66 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 	write_log(L"[Plugin] ", L"created hidden window");
 	write_pid(hwnd);
 
-    std::wstring testMsg = L"child ready";
-    COPYDATASTRUCT cds;
-    cds.dwData = PONG; // tùy code
-    cds.cbData = (DWORD)((testMsg.size() + 1) * sizeof(wchar_t));
-    cds.lpData = (PVOID)testMsg.c_str();
-
-	// Tìm parent process bằng PID thay vì window title
-	HWND hwndParent = NULL;
-	DWORD parentPid = param->appPid;
-	
-	struct EnumData {
-		DWORD targetPid;
-		HWND result;
-	} enumData = { parentPid, NULL };
-	
-	EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
-		EnumData* data = (EnumData*)lParam;
-		DWORD processId;
-		GetWindowThreadProcessId(hwnd, &processId);
-		if (processId == data->targetPid) {
-			data->result = hwnd;
-			return FALSE; // Dừng enum
-		}
-		return TRUE; // Tiếp tục enum
-	}, (LPARAM)&enumData);
-	
-	hwndParent = enumData.result;
-	
-    if (hwndParent) {
-        SendMessage(hwndParent, WM_COPYDATA, (WPARAM)hwnd, (LPARAM)&cds);
-        write_log(L"[Plugin] ", L"sent ready message to parent");
+    // Start Named Pipe server for child process
+    std::wstring pipeName = GetPipeName(utf8_to_wide(param->title));
+    g_pipeServer = std::make_unique<NamedPipeServer>(pipeName);
+    
+    if (g_pipeServer->Start(HandlePipeMessage)) {
+        write_log(L"[Plugin] ", L"Named Pipe server started");
     } else {
-        write_log(L"[Plugin] ", L"parent not found");
+        write_log(L"[Plugin] ", L"Failed to start Named Pipe server");
+    }
+    
+    // Send "child ready" message to parent via Named Pipe
+    std::wstring testMsg = L"child ready";
+    std::wstring parentPipeName = GetPipeName(utf8_to_wide(param->title));
+    NamedPipeClient parentClient(parentPipeName);
+    
+    if (parentClient.Connect()) {
+        std::string msgUtf8 = wide_to_utf8(testMsg);
+        PipeMessage message(PONG, msgUtf8);
+        if (parentClient.SendMessage(message)) {
+            write_log(L"[Plugin] ", L"sent ready message to parent via Named Pipe");
+        } else {
+            write_log(L"[Plugin] ", L"failed to send ready message via Named Pipe");
+        }
+    } else {
+        write_log(L"[Plugin] ", L"failed to connect to parent via Named Pipe");
+        
+        // Fallback: try WM_COPYDATA
+        COPYDATASTRUCT cds;
+        cds.dwData = PONG;
+        cds.cbData = (DWORD)((testMsg.size() + 1) * sizeof(wchar_t));
+        cds.lpData = (PVOID)testMsg.c_str();
+
+        // Tìm parent process bằng PID thay vì window title
+        HWND hwndParent = NULL;
+        DWORD parentPid = param->appPid;
+        
+        struct EnumData {
+            DWORD targetPid;
+            HWND result;
+        } enumData = { parentPid, NULL };
+        
+        EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
+            EnumData* data = (EnumData*)lParam;
+            DWORD processId;
+            GetWindowThreadProcessId(hwnd, &processId);
+            if (processId == data->targetPid) {
+                data->result = hwnd;
+                return FALSE; // Dừng enum
+            }
+            return TRUE; // Tiếp tục enum
+        }, (LPARAM)&enumData);
+        
+        hwndParent = enumData.result;
+        
+        if (hwndParent) {
+            SendMessage(hwndParent, WM_COPYDATA, (WPARAM)hwnd, (LPARAM)&cds);
+            write_log(L"[Plugin] ", L"sent ready message to parent via WM_COPYDATA");
+        } else {
+            write_log(L"[Plugin] ", L"parent not found");
+        }
     }
 
 	try {
@@ -148,6 +176,12 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 			DispatchMessage(&msg);
 		}
 
+		// Cleanup Named Pipe server
+		if (g_pipeServer) {
+			g_pipeServer->Stop();
+			g_pipeServer.reset();
+		}
+		
 		write_log(L"[Plugin] ", L"end process");
 		return 0;
 	}

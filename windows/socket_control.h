@@ -7,10 +7,11 @@
 #include "nlohmann/json.hpp"
 #include "utils.h"
 #include "win_toast.h"
+#include "named_pipe_communication.h"
 
 #include <winrt/windows.system.threading.h>
 
-// Command IDs cho WM_COPYDATA
+// Command IDs for Named Pipe communication
 #define CMD_UPDATE_SETTINGS   100
 #define CMD_UPDATE_REGISTER   200
 #define CMD_STOP_SERVICE      300
@@ -109,12 +110,22 @@ struct WebSocketControl
     }
 
     void _reveive(std::wstring msg) {
+        // Try to send message to parent process via Named Pipe
+        std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+        NamedPipeClient client(pipeName);
+        
+        if (client.Connect()) {
+            std::string msgUtf8 = wide_to_utf8(msg);
+            PipeMessage message(1, msgUtf8); // Command 1 for message
+            if (client.SendMessage(message)) {
+                write_log(L"[App Actived]", msg);
+                return;
+            }
+        }
+        
+        // Fallback: try to find window (for backward compatibility)
         HWND hwnd = FindWindow(NULL, utf8_to_wide(settings.title).c_str());
-        DWORD pidApp = 0;
-        GetWindowThreadProcessId(hwnd, &pidApp);
-        //long long pidAppLong = static_cast<long long>(pidApp);
-        //bool appActive = settings.appPid == pidAppLong;
-        if (hwnd && IsWindow(hwnd)) { //  && appActive
+        if (hwnd && IsWindow(hwnd)) {
             COPYDATASTRUCT cds;
             cds.dwData = 1;
             cds.cbData = (DWORD)(wcslen(msg.c_str()) + 1) * sizeof(wchar_t);
@@ -300,6 +311,50 @@ private:
 };
 
 inline std::unique_ptr<WebSocketControl> m_control;
+
+// Global Named Pipe server for child process
+inline std::unique_ptr<NamedPipeServer> g_pipeServer;
+
+// Message handler for Named Pipe
+inline void HandlePipeMessage(const PipeMessage& message) {
+    try {
+        switch (message.command) {
+        case CMD_UPDATE_SETTINGS: {
+            write_log(L"[Service] receive settings: ", utf8_to_wide(message.data));
+            
+            auto settings = pluginSettingsFromJson(message.data);
+            if (m_control) {
+                m_control->updateSettings(settings);
+            }
+            else {
+                write_log(L"[Service] control is null!", L"");
+            }
+            break;
+        }
+        case CMD_STOP_SERVICE: {
+            write_log(L"[Service] Stop command received", L"");
+            if (m_control) m_control->stop();
+            break;
+        }
+        case CMD_RECONNECT: {
+            write_log(L"[Service] Reconnect command", L"");
+            if (m_control) m_control->reconnect();
+            break;
+        }
+        default:
+            write_log(L"[Service] Unknown command", winrt::hstring(std::to_wstring(message.command)));
+            break;
+        }
+    }
+    catch (const std::exception& ex) {
+        write_error(ex, 166);
+        write_log(L"[Service] receive error: ", winrt::hstring(utf8_to_wide(ex.what())));
+    }
+    catch (...) {
+        write_error();
+        write_log(L"[Service] receive error: ", L"unknown");
+    }
+}
 
 inline LRESULT CALLBACK CtlHiddenWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {

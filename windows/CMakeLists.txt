@@ -30,6 +30,8 @@ list(APPEND PLUGIN_SOURCES
   "socket_control.h"
   "process.h"
   "model.h"
+  "named_pipe_communication.h"
+  "named_pipe_communication.cpp"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
