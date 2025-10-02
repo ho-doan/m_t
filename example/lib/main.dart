@@ -124,7 +124,15 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Plugin example app'),
           backgroundColor: Colors.blue,
         ),
-        body: _pages[_selectedIndex],
+        body: PageView.builder(
+          itemBuilder: (context, index) => _pages[index],
+          itemCount: _pages.length,
+          onPageChanged: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+        ),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: (index) {
