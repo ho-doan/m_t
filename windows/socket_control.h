@@ -126,7 +126,7 @@ struct WebSocketControl
             
             if (pipeClient.SendMessage(message)) {
                 write_log(L"[App Actived]", msg);
-                write_log(L"[DEBUG] ", (L"SOCKET_EVENT JSON: " + eventJson).c_str());
+                write_log(L"[DEBUG] ", (std::wstring(L"SOCKET_EVENT JSON: ") + utf8_to_wide(eventJson)).c_str());
                 return;
             }
         }
@@ -348,7 +348,7 @@ inline void HandlePipeMessage(const PipeMessage& message) {
                     PipeMessage ackMessage(PROTOCOL_ACK, ackJson);
                     if (client.SendMessage(ackMessage)) {
                         write_log(L"[Service] ", L"ACK sent to parent via Named Pipe");
-                        write_log(L"[DEBUG] ", (L"ACK JSON: " + ackJson).c_str());
+                        write_log(L"[DEBUG] ", (std::wstring(L"ACK JSON: ") + utf8_to_wide(ackJson)).c_str());
                     }
                     client.Disconnect();
                 }

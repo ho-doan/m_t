@@ -80,7 +80,7 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
         if (parentClient.SendMessage(message)) {
             write_log(L"[DEBUG] ", L"HELLO message sent to parent via Named Pipe");
             write_log(L"[Plugin] ", L"sent HELLO message to parent via Named Pipe");
-            write_log(L"[DEBUG] ", (L"HELLO JSON: " + helloJson).c_str());
+            write_log(L"[DEBUG] ", (std::wstring(L"HELLO JSON: ") + utf8_to_wide(helloJson)).c_str());
         } else {
             write_log(L"[DEBUG] ", L"Failed to send HELLO message via Named Pipe");
             write_log(L"[Plugin] ", L"failed to send HELLO message via Named Pipe");
@@ -90,6 +90,7 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
         write_log(L"[Plugin] ", L"failed to connect to parent via Named Pipe");
         
         // Fallback: try WM_COPYDATA
+        std::wstring testMsg = L"child ready";
         COPYDATASTRUCT cds;
         cds.dwData = PONG;
         cds.cbData = (DWORD)((testMsg.size() + 1) * sizeof(wchar_t));

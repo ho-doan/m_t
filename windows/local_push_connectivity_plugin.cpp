@@ -96,7 +96,7 @@ namespace local_push_connectivity {
             switch (message.command) {
             case PROTOCOL_HELLO: {
                 write_log(L"[Plugin] ", L"Received HELLO from child process via Named Pipe");
-                write_log(L"[DEBUG] ", (L"HELLO JSON: " + message.data).c_str());
+                write_log(L"[DEBUG] ", (std::wstring(L"HELLO JSON: ") + utf8_to_wide(message.data)).c_str());
                 
                 // Send HELLO_ACK response (matching diagram)
                 HelloAckMessage ackMsg;
@@ -104,14 +104,14 @@ namespace local_push_connectivity {
                 ackMsg.server_time = getCurrentTimeMs();
                 
                 std::string ackJson = toJson(ackMsg);
-                std::wstring pipeName = GetPipeName(utf8_to_wide(gSetting().title));
+                std::wstring pipeName = GetPipeName(utf8_to_wide(LocalPushConnectivityPlugin::gSetting().title));
                 NamedPipeClient client(pipeName);
                 
                 if (client.Connect()) {
                     PipeMessage ackMessage(PROTOCOL_HELLO_ACK, ackJson);
                     if (client.SendMessage(ackMessage)) {
                         write_log(L"[Plugin] ", L"HELLO_ACK sent to child via Named Pipe");
-                        write_log(L"[DEBUG] ", (L"HELLO_ACK JSON: " + ackJson).c_str());
+                        write_log(L"[DEBUG] ", (std::wstring(L"HELLO_ACK JSON: ") + utf8_to_wide(ackJson)).c_str());
                     }
                     client.Disconnect();
                 }
@@ -143,7 +143,7 @@ namespace local_push_connectivity {
             }
             case PROTOCOL_SOCKET_EVENT: {
                 write_log(L"[Plugin] ", L"Received SOCKET_EVENT from child via Named Pipe");
-                write_log(L"[DEBUG] ", (L"SOCKET_EVENT JSON: " + message.data).c_str());
+                write_log(L"[DEBUG] ", (std::wstring(L"SOCKET_EVENT JSON: ") + utf8_to_wide(message.data)).c_str());
                 
                 if (LocalPushConnectivityPlugin::_flutterApi) {
                     NotificationPigeon n = NotificationPigeon("n", "n");
@@ -161,7 +161,7 @@ namespace local_push_connectivity {
             }
             case PROTOCOL_PONG: {
                 write_log(L"[Plugin] ", L"Received PONG from child via Named Pipe");
-                write_log(L"[DEBUG] ", (L"PONG JSON: " + message.data).c_str());
+                write_log(L"[DEBUG] ", (std::wstring(L"PONG JSON: ") + utf8_to_wide(message.data)).c_str());
                 break;
             }
             case 1: { // Legacy message from child (backward compatibility)
@@ -261,7 +261,7 @@ namespace local_push_connectivity {
                 // Create SET_URL message (matching diagram)
                 SetUrlMessage setUrlMsg;
                 setUrlMsg.id = "m1"; // Message ID
-                setUrlMsg.url = settings.uri;
+                setUrlMsg.url = settings.uri();
                 setUrlMsg.opts = "{}"; // Empty options for now
                 
                 std::string setUrlJson = toJson(setUrlMsg);
@@ -269,7 +269,7 @@ namespace local_push_connectivity {
                 
                 if (client.SendMessage(message)) {
                     write_log(L"[SETTINGS] ", L"SET_URL sent via Named Pipe");
-                    write_log(L"[DEBUG] ", (L"SET_URL JSON: " + setUrlJson).c_str());
+                    write_log(L"[DEBUG] ", (std::wstring(L"SET_URL JSON: ") + utf8_to_wide(setUrlJson)).c_str());
                     client.Disconnect();
                     return;
                 } else {
@@ -304,6 +304,8 @@ namespace local_push_connectivity {
                 write_log(L"[ERROR SETTINGS] ", L"Invalid hwndChild");
                 return;
             }
+            // Create legacy settings message for WM_COPYDATA fallback
+            std::string commandLine = pluginSettingsToJson(settings);
             std::wstring c = utf8_to_wide(commandLine);
             COPYDATASTRUCT cds;
             cds.dwData = 100;
