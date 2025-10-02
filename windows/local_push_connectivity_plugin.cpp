@@ -12,6 +12,7 @@
 
 #include <memory>
 #include <sstream>
+#include <atomic>
 
 #include "messages.g.h"
 #include "win_toast.h"
@@ -53,6 +54,9 @@ namespace local_push_connectivity {
     
     // Global Named Pipe server for parent process
     std::unique_ptr<NamedPipeServer> g_parentPipeServer;
+    
+    // Flag to prevent multiple process creation
+    std::atomic<bool> g_creatingProcess{ false };
     int LocalPushConnectivityPlugin::RegisterProcess(std::wstring title,
         _In_ wchar_t* command_line) {
         MyProcess p(title, command_line);
@@ -321,17 +325,29 @@ namespace local_push_connectivity {
                     });
                 HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
                 if (!hwndChild) {
+                    // Check if we're already creating a process
+                    if (g_creatingProcess.load()) {
+                        write_log(L"[Plugin] ", L"Process creation already in progress, skipping");
+                        result(true);
+                        return;
+                    }
+                    
+                    write_log(L"[Plugin] ", L"No child process found, creating new one");
+                    g_creatingProcess.store(true);
                     auto status = LocalPushConnectivityPlugin::createBackgroundProcess();
                     if (status == -8) {
                         // Chờ child process khởi tạo xong với timeout
                         _result = result;
                         LocalPushConnectivityPlugin::waitForChildProcessReady();
+                        g_creatingProcess.store(false);
                         return;
                     }
+                    g_creatingProcess.store(false);
                     result(true);
                     return;
                 }
                 else {
+                    write_log(L"[Plugin] ", L"Child process already exists, sending settings");
                     LocalPushConnectivityPlugin::sendSettings();
                 }
 
@@ -474,7 +490,18 @@ namespace local_push_connectivity {
         try {
             auto oldPid = read_pid();
             if (oldPid && IsWindow(oldPid)) {
-                return -1;
+                write_log(L"[Plugin] ", L"Old process still exists, killing it first");
+                // Kill old process
+                DWORD processId;
+                GetWindowThreadProcessId(oldPid, &processId);
+                HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, processId);
+                if (hProcess) {
+                    TerminateProcess(hProcess, 0);
+                    CloseHandle(hProcess);
+                    write_log(L"[Plugin] ", L"Old process terminated");
+                    // Wait a bit for cleanup
+                    Sleep(1000);
+                }
             }
 
             PROCESS_INFORMATION pi;
@@ -552,8 +579,9 @@ namespace local_push_connectivity {
                 elapsedMs += checkIntervalMs;
             }
             
-            // Nếu timeout, gửi lỗi về app
-            write_log(L"[Plugin] ", L"Timeout waiting for child process");
+            // Nếu timeout, gửi lỗi về app và cleanup
+            write_log(L"[Plugin] ", L"Timeout waiting for child process - cleaning up");
+            g_creatingProcess.store(false);
             if (_result) {
                 _result(false);
                 _result = NULL;
@@ -561,6 +589,7 @@ namespace local_push_connectivity {
         }
         catch (const std::exception& ex) {
             write_error(ex, 500);
+            g_creatingProcess.store(false);
             if (_result) {
                 _result(false);
                 _result = NULL;
@@ -568,6 +597,7 @@ namespace local_push_connectivity {
         }
         catch (...) {
             write_error();
+            g_creatingProcess.store(false);
             if (_result) {
                 _result(false);
                 _result = NULL;
