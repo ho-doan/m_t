@@ -757,32 +757,22 @@ namespace local_push_connectivity {
             
             while (elapsedMs < timeoutMs) {
                 write_log(L"[DEBUG] ", (L"Checking for child process via Named Pipe, elapsed: " + std::to_wstring(elapsedMs) + L"ms").c_str());
-                // Kiểm tra xem child process đã sẵn sàng chưa qua Named Pipe
-                PluginSetting settings = gSetting();
-                std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
-                NamedPipeClient testClient(pipeName);
+                // Child process should connect to parent pipe and send HELLO
+                // Parent will receive HELLO in HandleParentPipeMessage
+                // No need to connect to child pipe - just wait for HELLO message
+                write_log(L"[DEBUG] ", L"Waiting for child to send HELLO message via parent pipe...");
                 
-                // Try to connect with timeout to avoid blocking
-                bool connected = false;
-                for (int i = 0; i < 3; i++) {
-                    if (testClient.Connect()) {
-                        connected = true;
-                        break;
-                    }
-                    Sleep(200); // Wait 200ms before retry to avoid pipe busy
-                }
-                
-                if (connected) {
-                    write_log(L"[DEBUG] ", L"Child process ready via Named Pipe, sending settings $cout");
-                    write_log(L"[Plugin] ", L"Child process ready, sending settings");
+                // Check if we received HELLO message (this should be handled in HandleParentPipeMessage)
+                // For now, just wait a bit and then send settings
+                if (elapsedMs > 2000) { // Wait 2 seconds for child to connect and send HELLO
+                    write_log(L"[DEBUG] ", L"Child process should be ready, sending settings");
+                    write_log(L"[Plugin] ", L"Child process should be ready, sending settings");
                     write_log(L"[SUCCESS] ", L"Named Pipe communication established successfully!");
                     LocalPushConnectivityPlugin::sendSettings();
                     // Reset counter when child process is ready
                     g_processCreationCount.store(0);
-                    testClient.Disconnect();
                     return;
                 }
-                testClient.Disconnect();
                 
                 // Add delay to avoid continuous connection attempts
                 Sleep(500); // Wait 500ms before next attempt

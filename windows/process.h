@@ -59,7 +59,20 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
     
     write_log(L"[DEBUG] ", (L"Attempting to connect to parent pipe: " + parentPipeName).c_str());
     write_log(L"[Plugin] ", (L"Child trying to connect to parent pipe: " + parentPipeName).c_str());
-    if (parentClient.Connect()) {
+    
+    // Try to connect with retry
+    bool connected = false;
+    for (int i = 0; i < 5; i++) {
+        if (parentClient.Connect()) {
+            connected = true;
+            write_log(L"[SUCCESS] ", L"Child successfully connected to parent pipe!");
+            break;
+        }
+        write_log(L"[DEBUG] ", (L"Connection attempt " + std::to_wstring(i + 1) + L" failed, retrying...").c_str());
+        Sleep(200);
+    }
+    
+    if (connected) {
         write_log(L"[DEBUG] ", L"Connected to parent pipe, sending HELLO message");
         
         // Create HELLO message (matching diagram)

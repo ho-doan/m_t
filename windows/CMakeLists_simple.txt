@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.10)
+project(SimplePipeSample)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Add executable
+add_executable(simple_pipe_sample
+    minimal_pipe.cpp
+)
+
+# Link Windows libraries
+target_link_libraries(simple_pipe_sample
+    kernel32
+    user32
+    advapi32
+)
+
+# Set output directory
+set_target_properties(simple_pipe_sample PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+# Copy executable to example directory for testing
+add_custom_command(TARGET simple_pipe_sample POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:simple_pipe_sample>
+    "${CMAKE_SOURCE_DIR}/example/bin/"
+    COMMENT "Copying simple_pipe_sample to example/bin/"
+)
