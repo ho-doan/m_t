@@ -44,18 +44,7 @@ namespace local_push_connectivity {
         }
     }
 
-    LocalPushConnectivityPlugin::LocalPushConnectivityPlugin() {}
-
-    LocalPushConnectivityPlugin::~LocalPushConnectivityPlugin() {
-        // Cleanup when plugin is destroyed
-        if (g_parentPipeServer) {
-            g_parentPipeServer->Stop();
-            g_parentPipeServer.reset();
-        }
-        g_initialized.store(false);
-        g_creatingProcess.store(false);
-        write_log(L"[Plugin] ", L"Plugin destroyed, cleaned up resources");
-    }
+    // Global variables (must be declared before any methods that use them)
     std::unique_ptr<LocalPushConnectivityPigeonFlutterApi> LocalPushConnectivityPlugin::_flutterApi = NULL;
     std::wstring LocalPushConnectivityPlugin::_title = L"";
     bool LocalPushConnectivityPlugin::_flutterApiReady = false;
@@ -69,6 +58,19 @@ namespace local_push_connectivity {
     
     // Flag to prevent multiple initialization
     std::atomic<bool> g_initialized{ false };
+
+    LocalPushConnectivityPlugin::LocalPushConnectivityPlugin() {}
+
+    LocalPushConnectivityPlugin::~LocalPushConnectivityPlugin() {
+        // Cleanup when plugin is destroyed
+        if (g_parentPipeServer) {
+            g_parentPipeServer->Stop();
+            g_parentPipeServer.reset();
+        }
+        g_initialized.store(false);
+        g_creatingProcess.store(false);
+        write_log(L"[Plugin] ", L"Plugin destroyed, cleaned up resources");
+    }
     int LocalPushConnectivityPlugin::RegisterProcess(std::wstring title,
         _In_ wchar_t* command_line) {
         MyProcess p(title, command_line);
