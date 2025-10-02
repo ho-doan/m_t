@@ -439,7 +439,7 @@ namespace local_push_connectivity {
                     LocalPushConnectivityPlugin::sendSettings();
                     // Reset counter when child process exists
                     g_processCreationCount.store(0);
-                    testClient.ClosePipe();
+                    testClient.Disconnect();
                 }
 
                 g_initialized.store(true);
@@ -678,10 +678,10 @@ namespace local_push_connectivity {
                     LocalPushConnectivityPlugin::sendSettings();
                     // Reset counter when child process is ready
                     g_processCreationCount.store(0);
-                    testClient.ClosePipe();
+                    testClient.Disconnect();
                     return;
                 }
-                testClient.ClosePipe();
+                testClient.Disconnect();
                 
                 // Thêm logging để debug
                 if (elapsedMs % 1000 == 0) { // Log mỗi giây
