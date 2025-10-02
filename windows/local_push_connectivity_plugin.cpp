@@ -106,7 +106,8 @@ namespace local_push_connectivity {
             }
             case PIPE_CMD_UPDATE_SETTINGS: {
                 write_log(L"[Plugin] ", L"Received UPDATE_SETTINGS command from child via Named Pipe");
-                // This is a settings update request, handle it
+                // This is a settings update request from child, don't send settings back
+                // Just acknowledge receipt
                 break;
             }
             case 1: { // Message from child
@@ -201,7 +202,7 @@ namespace local_push_connectivity {
                     connected = true;
                     break;
                 }
-                Sleep(50); // Wait 50ms before retry
+                Sleep(200); // Wait 200ms before retry to avoid pipe busy
             }
             
             if (connected) {
@@ -706,7 +707,7 @@ namespace local_push_connectivity {
                         connected = true;
                         break;
                     }
-                    Sleep(100); // Wait 100ms before retry
+                    Sleep(200); // Wait 200ms before retry to avoid pipe busy
                 }
                 
                 if (connected) {
@@ -719,6 +720,9 @@ namespace local_push_connectivity {
                     return;
                 }
                 testClient.Disconnect();
+                
+                // Add delay to avoid continuous connection attempts
+                Sleep(500); // Wait 500ms before next attempt
                 
                 // Thêm logging để debug
                 if (elapsedMs % 1000 == 0) { // Log mỗi giây
