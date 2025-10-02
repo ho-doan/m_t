@@ -92,7 +92,7 @@ namespace local_push_connectivity {
                 break;
             }
             default:
-                write_log(L"[Plugin] ", L"Unknown command from child: " + std::to_wstring(message.command));
+                write_log(L"[Plugin] ", (L"Unknown command from child: " + std::to_wstring(message.command)).c_str());
                 break;
             }
         }
