@@ -82,9 +82,9 @@ namespace local_push_connectivity {
     }
     int LocalPushConnectivityPlugin::RegisterProcess(std::wstring title,
         _In_ wchar_t* command_line) {
-        write_log(L"[DEBUG] ", L"RegisterProcess called with title: " + title);
+        write_log(L"[DEBUG] ", (L"RegisterProcess called with title: " + title).c_str());
         MyProcess p(title, command_line);
-        write_log(L"[DEBUG] ", L"RegisterProcess returning mode: " + std::to_wstring(p.mode));
+        write_log(L"[DEBUG] ", (L"RegisterProcess returning mode: " + std::to_wstring(p.mode)).c_str());
         return p.mode;
     }
 
@@ -342,7 +342,7 @@ namespace local_push_connectivity {
                 if (!g_parentPipeServer) {
                     write_log(L"[DEBUG] ", L"Creating new Named Pipe server");
                     std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
-                    write_log(L"[DEBUG] ", L"Pipe name: " + pipeName);
+                    write_log(L"[DEBUG] ", (L"Pipe name: " + pipeName).c_str());
                     g_parentPipeServer = std::make_unique<NamedPipeServer>(pipeName);
                     
                     if (g_parentPipeServer->Start(HandleParentPipeMessage)) {
@@ -448,7 +448,7 @@ namespace local_push_connectivity {
         }
         catch (const std::exception& ex) {
             write_error(ex, 475);
-            write_log(L"[ERROR] ", L"Exception in Initialize: " + utf8_to_wide(ex.what()) + L" $cout");
+            write_log(L"[ERROR] ", (L"Exception in Initialize: " + utf8_to_wide(ex.what()) + L" $cout").c_str());
             g_initialized.store(false);
             g_processCreationCount.store(0);
             result(false);
@@ -593,7 +593,7 @@ namespace local_push_connectivity {
                 // Kill old process
                 DWORD processId;
                 GetWindowThreadProcessId(oldPid, &processId);
-                write_log(L"[DEBUG] ", L"Killing process ID: " + std::to_wstring(processId));
+                write_log(L"[DEBUG] ", (L"Killing process ID: " + std::to_wstring(processId)).c_str());
                 HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, processId);
                 if (hProcess) {
                     TerminateProcess(hProcess, 0);
@@ -636,7 +636,7 @@ namespace local_push_connectivity {
             }
             else {
                 DWORD error = GetLastError();
-                write_log(L"[DEBUG] ", L"CreateProcess failed with error: " + std::to_wstring(error));
+                write_log(L"[DEBUG] ", (L"CreateProcess failed with error: " + std::to_wstring(error)).c_str());
                 std::wcerr << L"create process error" << error << std::endl;
             }
             return -1;
@@ -663,7 +663,7 @@ namespace local_push_connectivity {
             write_log(L"[Plugin] ", L"Starting to wait for child process...");
             
             while (elapsedMs < timeoutMs) {
-                write_log(L"[DEBUG] ", L"Checking for child process, elapsed: " + std::to_wstring(elapsedMs) + L"ms");
+                write_log(L"[DEBUG] ", (L"Checking for child process, elapsed: " + std::to_wstring(elapsedMs) + L"ms").c_str());
                 // Kiểm tra xem child process đã sẵn sàng chưa
                 PluginSetting settings = gSetting();
                 auto notification_title = utf8_to_wide(settings.title_notification);
