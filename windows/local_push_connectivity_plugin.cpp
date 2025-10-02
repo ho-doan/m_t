@@ -378,8 +378,26 @@ namespace local_push_connectivity {
                     write_log(L"[DEBUG] ", L"No child process found");
                     write_log(L"[DEBUG] ", L"g_creatingProcess.load(): " + std::to_wstring(g_creatingProcess.load()));
                     
-                    // Check process creation counter
-                    int currentCount = g_processCreationCount.load();
+                    // Extract counter from command_line and increment
+                    std::wstring commandLine = GetCommandLineW();
+                    int currentCount = 0;
+                    
+                    // Try to extract counter from command line (format: "app.exe child settings $cout:5")
+                    size_t coutPos = commandLine.find(L"$cout:");
+                    if (coutPos != std::wstring::npos) {
+                        size_t startPos = coutPos + 6; // Skip "$cout:"
+                        size_t endPos = commandLine.find(L" ", startPos);
+                        if (endPos == std::wstring::npos) endPos = commandLine.length();
+                        
+                        std::wstring countStr = commandLine.substr(startPos, endPos - startPos);
+                        try {
+                            currentCount = std::stoi(countStr);
+                        } catch (...) {
+                            currentCount = 0;
+                        }
+                    }
+                    
+                    currentCount++; // Increment counter
                     write_log(L"[DEBUG] ", L"Process creation count: " + std::to_wstring(currentCount) + L" $cout");
                     
                     if (currentCount >= 10) {
@@ -398,8 +416,7 @@ namespace local_push_connectivity {
                     write_log(L"[DEBUG] ", L"Creating new child process...");
                     write_log(L"[Plugin] ", L"No child process found, creating new one");
                     g_creatingProcess.store(true);
-                    g_processCreationCount.fetch_add(1);
-                    auto status = LocalPushConnectivityPlugin::createBackgroundProcess();
+                    auto status = LocalPushConnectivityPlugin::createBackgroundProcess(currentCount);
                     write_log(L"[DEBUG] ", L"createBackgroundProcess returned: " + std::to_wstring(status));
                     
                     if (status == -8) {
@@ -564,9 +581,9 @@ namespace local_push_connectivity {
 
     PluginSetting LocalPushConnectivityPlugin::_settings{};
 
-    int LocalPushConnectivityPlugin::createBackgroundProcess() {
+    int LocalPushConnectivityPlugin::createBackgroundProcess(int counter) {
         try {
-            write_log(L"[DEBUG] ", L"createBackgroundProcess called $cout");
+            write_log(L"[DEBUG] ", L"createBackgroundProcess called with counter: " + std::to_wstring(counter) + L" $cout");
             auto oldPid = read_pid();
             write_log(L"[DEBUG] ", L"oldPid: " + std::to_wstring(reinterpret_cast<uintptr_t>(oldPid)));
             
@@ -602,7 +619,7 @@ namespace local_push_connectivity {
             std::string m_settings = pluginSettingsToJson(settings);
 
             std::wstring wideSettings = utf8_to_wide(m_settings);
-            std::wstring commandLine = L"\"" + std::wstring(execuablePath) + L"\" child \"" + wideSettings + L"\"";
+            std::wstring commandLine = L"\"" + std::wstring(execuablePath) + L"\" child \"" + wideSettings + L"\" $cout:" + std::to_wstring(counter);
 
             write_log(L"[DEBUG] ", L"Creating process with command: " + commandLine + L" $cout");
             std::wcout << "exe service notification: " << commandLine << L"\n";
