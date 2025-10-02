@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:local_push_connectivity/local_push_connectivity.dart';
 import 'timer_app.dart';
+import 'ipc_app.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -72,7 +73,11 @@ class _MyAppState extends State<MyApp> {
   int _selectedIndex = 0;
 
   // Pages
-  final List<Widget> _pages = [const MainPage(), const TimerApp()];
+  final List<Widget> _pages = [
+    const MainPage(),
+    const TimerApp(),
+    const IPCApp(),
+  ];
 
   @override
   void initState() {
@@ -143,6 +148,7 @@ class _MyAppState extends State<MyApp> {
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Main'),
             BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'Timer'),
+            BottomNavigationBarItem(icon: Icon(Icons.sync), label: 'IPC'),
           ],
         ),
       ),

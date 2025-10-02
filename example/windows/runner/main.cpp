@@ -14,6 +14,8 @@
 // Simple Timer Integration
 std::atomic<bool> g_timerRunning{false};
 std::string g_currentTime;
+std::string g_updateTime;
+std::string g_setTime;
 
 void log(const std::wstring& msg) {
     std::wcout << L"[TIMER] " << msg << std::endl;
@@ -31,7 +33,15 @@ void TimerLoop() {
         
         g_currentTime = std::to_string(time_t) + "." + std::to_string(ms.count());
         
+        // Get update time (formatted)
+        auto time_point = std::chrono::system_clock::to_time_t(now);
+        auto tm = *std::localtime(&time_point);
+        char buffer[64];
+        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+        g_updateTime = std::string(buffer) + "." + std::to_string(ms.count());
+        
         log(L"Current time: " + std::wstring(g_currentTime.begin(), g_currentTime.end()));
+        log(L"Update time: " + std::wstring(g_updateTime.begin(), g_updateTime.end()));
         
         Sleep(1000); // Update every second
     }
@@ -68,6 +78,21 @@ extern "C" {
     
     __declspec(dllexport) const char* FlutterTimer_GetCurrentTime() {
         return g_currentTime.c_str();
+    }
+    
+    __declspec(dllexport) const char* FlutterTimer_UpdateAtTime() {
+        return g_updateTime.c_str();
+    }
+    
+    __declspec(dllexport) void FlutterTimer_SetAtTime(const char* timeStr) {
+        if (timeStr != nullptr) {
+            g_setTime = std::string(timeStr);
+            log(L"Set time: " + std::wstring(g_setTime.begin(), g_setTime.end()));
+        }
+    }
+    
+    __declspec(dllexport) const char* FlutterTimer_GetSetTime() {
+        return g_setTime.c_str();
     }
 }
 

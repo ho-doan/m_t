@@ -112,4 +112,69 @@ class FlutterTimerPlugin {
       return '';
     }
   }
+
+  // Get update at time
+  String getUpdateAtTime() {
+    if (!_initialized) {
+      print('FlutterTimerPlugin: Not initialized');
+      return '';
+    }
+
+    try {
+      final getUpdateAtTime = _dylib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+            'FlutterTimer_UpdateAtTime',
+          );
+
+      final timePtr = getUpdateAtTime();
+      return timePtr.toDartString();
+    } catch (e) {
+      print('FlutterTimerPlugin: Failed to get update at time: $e');
+      return '';
+    }
+  }
+
+  // Set at time
+  Future<void> setAtTime(String timeStr) async {
+    if (!_initialized) {
+      print('FlutterTimerPlugin: Not initialized');
+      return;
+    }
+
+    try {
+      final setAtTime = _dylib.lookupFunction<
+        Void Function(Pointer<Utf8>),
+        void Function(Pointer<Utf8>)
+      >('FlutterTimer_SetAtTime');
+
+      final timePtr = timeStr.toNativeUtf8();
+      setAtTime(timePtr);
+      malloc.free(timePtr);
+
+      print('FlutterTimerPlugin: Set time: $timeStr');
+    } catch (e) {
+      print('FlutterTimerPlugin: Failed to set time: $e');
+    }
+  }
+
+  // Get set time
+  String getSetTime() {
+    if (!_initialized) {
+      print('FlutterTimerPlugin: Not initialized');
+      return '';
+    }
+
+    try {
+      final getSetTime = _dylib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+            'FlutterTimer_GetSetTime',
+          );
+
+      final timePtr = getSetTime();
+      return timePtr.toDartString();
+    } catch (e) {
+      print('FlutterTimerPlugin: Failed to get set time: $e');
+      return '';
+    }
+  }
 }
