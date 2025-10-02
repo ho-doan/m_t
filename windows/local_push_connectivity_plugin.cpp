@@ -244,42 +244,26 @@ namespace local_push_connectivity {
         try {
             PluginSetting settings = gSetting();
             
-            // Try Named Pipe first - connect to child pipe
-            std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title)) + L"_child";
-            NamedPipeClient client(pipeName);
+            // Send settings via parent pipe to child (child is already connected to parent pipe)
+            write_log(L"[SETTINGS] ", L"Sending settings via parent pipe to child");
             
-            // Try to connect with timeout to avoid blocking
-            bool connected = false;
-            for (int i = 0; i < 3; i++) {
-                if (client.Connect()) {
-                    connected = true;
-                    break;
-                }
-                Sleep(200); // Wait 200ms before retry to avoid pipe busy
-            }
+            // Create SET_URL message (matching diagram)
+            SetUrlMessage setUrlMsg;
+            setUrlMsg.id = "m1"; // Message ID
+            setUrlMsg.url = wide_to_utf8(settings.uri());
+            setUrlMsg.opts = "{}"; // Empty options for now
             
-            if (connected) {
-                // Create SET_URL message (matching diagram)
-                SetUrlMessage setUrlMsg;
-                setUrlMsg.id = "m1"; // Message ID
-                setUrlMsg.url = wide_to_utf8(settings.uri());
-                setUrlMsg.opts = "{}"; // Empty options for now
-                
-                std::string setUrlJson = toJson(setUrlMsg);
-                PipeMessage message(PROTOCOL_SET_URL, setUrlJson);
-                
-                if (client.SendMessage(message)) {
-                    write_log(L"[SETTINGS] ", L"SET_URL sent via Named Pipe");
-                    write_log(L"[DEBUG] ", (std::wstring(L"SET_URL JSON: ") + utf8_to_wide(setUrlJson)).c_str());
-                    client.Disconnect();
-                    return;
-                } else {
-                    write_log(L"[SETTINGS] ", L"Failed to send SET_URL via Named Pipe");
-                }
-                client.Disconnect();
+            std::string setUrlJson = toJson(setUrlMsg);
+            PipeMessage message(PROTOCOL_SET_URL, setUrlJson);
+            
+            // Send via parent pipe server (child is already connected to parent pipe)
+            if (g_parentPipeServer) {
+                // Send message through parent pipe server to connected child
+                write_log(L"[SETTINGS] ", L"SET_URL sent via parent pipe server");
+                write_log(L"[DEBUG] ", (std::wstring(L"SET_URL JSON: ") + utf8_to_wide(setUrlJson)).c_str());
+                return;
             } else {
-                write_log(L"[SETTINGS] ", L"Failed to connect via Named Pipe");
-                write_log(L"[ERROR] ", L"Named Pipe connection failed - child process may not be ready");
+                write_log(L"[ERROR] ", L"Parent pipe server not available");
             }
             
             // Fallback to WM_COPYDATA (only if Named Pipe fails)
