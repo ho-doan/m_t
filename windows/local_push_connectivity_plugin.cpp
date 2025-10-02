@@ -370,11 +370,13 @@ namespace local_push_connectivity {
 
                         sendMessageFromNoti(m);
                     });
-                write_log(L"[DEBUG] ", (L"Looking for child process window: " + notification_title).c_str());
-                HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
-                write_log(L"[DEBUG] ", (L"hwndChild: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwndChild))).c_str());
+                write_log(L"[DEBUG] ", L"Checking if child process is ready via Named Pipe...");
                 
-                if (!hwndChild) {
+                // Check if child process is ready via Named Pipe instead of FindWindow
+                std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+                NamedPipeClient testClient(pipeName);
+                
+                if (!testClient.Connect()) {
                     write_log(L"[DEBUG] ", L"No child process found");
                     write_log(L"[DEBUG] ", (L"g_creatingProcess.load(): " + std::to_wstring(g_creatingProcess.load())).c_str());
                     
@@ -432,11 +434,12 @@ namespace local_push_connectivity {
                     return;
                 }
                 else {
-                    write_log(L"[DEBUG] ", L"Child process already exists, sending settings");
+                    write_log(L"[DEBUG] ", L"Child process already exists via Named Pipe, sending settings");
                     write_log(L"[Plugin] ", L"Child process already exists, sending settings");
                     LocalPushConnectivityPlugin::sendSettings();
                     // Reset counter when child process exists
                     g_processCreationCount.store(0);
+                    testClient.ClosePipe();
                 }
 
                 g_initialized.store(true);
@@ -663,23 +666,22 @@ namespace local_push_connectivity {
             write_log(L"[Plugin] ", L"Starting to wait for child process...");
             
             while (elapsedMs < timeoutMs) {
-                write_log(L"[DEBUG] ", (L"Checking for child process, elapsed: " + std::to_wstring(elapsedMs) + L"ms").c_str());
-                // Kiểm tra xem child process đã sẵn sàng chưa
+                write_log(L"[DEBUG] ", (L"Checking for child process via Named Pipe, elapsed: " + std::to_wstring(elapsedMs) + L"ms").c_str());
+                // Kiểm tra xem child process đã sẵn sàng chưa qua Named Pipe
                 PluginSetting settings = gSetting();
-                auto notification_title = utf8_to_wide(settings.title_notification);
+                std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+                NamedPipeClient testClient(pipeName);
                 
-                // Tìm window theo class name (không phải window title)
-                HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
-                write_log(L"[DEBUG] ", (L"Found window: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwndChild))).c_str());
-                
-                if (hwndChild && IsWindow(hwndChild)) {
-                    write_log(L"[DEBUG] ", L"Child process ready, sending settings $cout");
+                if (testClient.Connect()) {
+                    write_log(L"[DEBUG] ", L"Child process ready via Named Pipe, sending settings $cout");
                     write_log(L"[Plugin] ", L"Child process ready, sending settings");
                     LocalPushConnectivityPlugin::sendSettings();
                     // Reset counter when child process is ready
                     g_processCreationCount.store(0);
+                    testClient.ClosePipe();
                     return;
                 }
+                testClient.ClosePipe();
                 
                 // Thêm logging để debug
                 if (elapsedMs % 1000 == 0) { // Log mỗi giây
