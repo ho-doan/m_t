@@ -11,11 +11,11 @@
 
 #include <winrt/windows.system.threading.h>
 
-// Command IDs for Named Pipe communication
-#define CMD_UPDATE_SETTINGS   100
+// Command IDs for Named Pipe communication (use same as named_pipe_communication.h)
+#define CMD_UPDATE_SETTINGS   PIPE_CMD_UPDATE_SETTINGS
 #define CMD_UPDATE_REGISTER   200
-#define CMD_STOP_SERVICE      300
-#define CMD_RECONNECT         400
+#define CMD_STOP_SERVICE      PIPE_CMD_STOP_SERVICE
+#define CMD_RECONNECT         PIPE_CMD_RECONNECT
 
 using namespace winrt;
 using namespace Windows::System::Threading;
@@ -354,54 +354,4 @@ inline void HandlePipeMessage(const PipeMessage& message) {
         write_error();
         write_log(L"[Service] receive error: ", L"unknown");
     }
-}
-
-inline LRESULT CALLBACK CtlHiddenWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-    case WM_COPYDATA: {
-        auto* pCDS = reinterpret_cast<PCOPYDATASTRUCT>(lParam);
-        if (!pCDS) return FALSE;
-
-        try {
-            switch (pCDS->dwData) {
-            case CMD_UPDATE_SETTINGS: {
-                std::wstring receiver((wchar_t*)pCDS->lpData);
-                write_log(L"[Service] receive settings: ", receiver);
-
-                auto settings = pluginSettingsFromJson(wide_to_utf8(receiver));
-                if (m_control) {
-                    m_control->updateSettings(settings);
-                }
-                else {
-                    write_log(L"[Service] control is null!", L"");
-                }
-                break;
-            }
-            case CMD_STOP_SERVICE: {
-                write_log(L"[Service] Stop command received", L"");
-                if (m_control) m_control->stop();
-                break;
-            }
-            case CMD_RECONNECT: {
-                write_log(L"[Service] Reconnect command", L"");
-                if (m_control) m_control->reconnect();
-                break;
-            }
-            default:
-                write_log(L"[Service] Unknown command", winrt::hstring(std::to_wstring(pCDS->dwData)));
-                break;
-            }
-        }
-        catch (const std::exception& ex) {
-            write_error(ex, 166);
-            write_log(L"[Service] receive error: ", winrt::hstring(utf8_to_wide(ex.what())));
-        }
-        catch (...) {
-            write_error();
-            write_log(L"[Service] receive error: ", L"unknown");
-        }
-        return TRUE;
-    }
-    }
-    return DefWindowProc(hwnd, msg, wParam, lParam);
 }
