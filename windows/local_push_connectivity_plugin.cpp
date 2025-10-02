@@ -97,6 +97,7 @@ namespace local_push_connectivity {
             case PROTOCOL_HELLO: {
                 write_log(L"[Plugin] ", L"Received HELLO from child process via Named Pipe");
                 write_log(L"[DEBUG] ", (std::wstring(L"HELLO JSON: ") + utf8_to_wide(message.data)).c_str());
+                write_log(L"[SUCCESS] ", L"Child process successfully connected via Named Pipe!");
                 
                 // Send HELLO_ACK response (matching diagram)
                 HelloAckMessage ackMsg;
@@ -278,6 +279,7 @@ namespace local_push_connectivity {
                 client.Disconnect();
             } else {
                 write_log(L"[SETTINGS] ", L"Failed to connect via Named Pipe");
+                write_log(L"[ERROR] ", L"Named Pipe connection failed - child process may not be ready");
             }
             
             // Fallback to WM_COPYDATA (only if Named Pipe fails)
@@ -789,6 +791,7 @@ namespace local_push_connectivity {
                 if (connected) {
                     write_log(L"[DEBUG] ", L"Child process ready via Named Pipe, sending settings $cout");
                     write_log(L"[Plugin] ", L"Child process ready, sending settings");
+                    write_log(L"[SUCCESS] ", L"Named Pipe communication established successfully!");
                     LocalPushConnectivityPlugin::sendSettings();
                     // Reset counter when child process is ready
                     g_processCreationCount.store(0);

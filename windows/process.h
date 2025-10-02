@@ -66,6 +66,7 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
     Sleep(500);
     
     write_log(L"[DEBUG] ", (L"Attempting to connect to parent pipe: " + parentPipeName).c_str());
+    write_log(L"[Plugin] ", (L"Child trying to connect to parent pipe: " + parentPipeName).c_str());
     if (parentClient.Connect()) {
         write_log(L"[DEBUG] ", L"Connected to parent pipe, sending HELLO message");
         
@@ -88,6 +89,7 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
     } else {
         write_log(L"[DEBUG] ", L"Failed to connect to parent via Named Pipe");
         write_log(L"[Plugin] ", L"failed to connect to parent via Named Pipe");
+        write_log(L"[ERROR] ", L"Child process cannot connect to parent pipe - will use WM_COPYDATA fallback");
         
         // Fallback: try WM_COPYDATA
         std::wstring testMsg = L"child ready";
