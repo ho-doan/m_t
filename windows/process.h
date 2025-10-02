@@ -92,13 +92,13 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 		write_log(L"[Plugin] ", L"create hidden failed");
 		return 1;
 	}
-	write_log(L"[DEBUG] ", L"Hidden window created successfully: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwnd)));
+	write_log(L"[DEBUG] ", (L"Hidden window created successfully: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwnd))).c_str());
 	write_log(L"[Plugin] ", L"created hidden window");
 	write_pid(hwnd);
 
     // Start Named Pipe server for child process
     std::wstring pipeName = GetPipeName(utf8_to_wide(param->title));
-    write_log(L"[DEBUG] ", L"Child process pipe name: " + pipeName);
+    write_log(L"[DEBUG] ", (L"Child process pipe name: " + pipeName).c_str());
     g_pipeServer = std::make_unique<NamedPipeServer>(pipeName);
     
     if (g_pipeServer->Start(HandlePipeMessage)) {
@@ -114,7 +114,7 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
     std::wstring parentPipeName = GetPipeName(utf8_to_wide(param->title));
     NamedPipeClient parentClient(parentPipeName);
     
-    write_log(L"[DEBUG] ", L"Attempting to connect to parent pipe: " + parentPipeName);
+    write_log(L"[DEBUG] ", (L"Attempting to connect to parent pipe: " + parentPipeName).c_str());
     if (parentClient.Connect()) {
         write_log(L"[DEBUG] ", L"Connected to parent pipe, sending ready message");
         std::string msgUtf8 = wide_to_utf8(testMsg);

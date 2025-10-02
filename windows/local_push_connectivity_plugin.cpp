@@ -289,8 +289,8 @@ namespace local_push_connectivity {
         const TCPModePigeon& mode,
         std::function<void(ErrorOr<bool> reply)> result) {
         try {
-            write_log(L"[DEBUG] ", L"Initialize called with system_type: " + std::to_wstring(system_type));
-            write_log(L"[DEBUG] ", L"g_initialized.load(): " + std::to_wstring(g_initialized.load()));
+            write_log(L"[DEBUG] ", (L"Initialize called with system_type: " + std::to_wstring(system_type)).c_str());
+            write_log(L"[DEBUG] ", (L"g_initialized.load(): " + std::to_wstring(g_initialized.load())).c_str());
             
             // Check if already initialized
             if (g_initialized.load()) {
@@ -370,13 +370,13 @@ namespace local_push_connectivity {
 
                         sendMessageFromNoti(m);
                     });
-                write_log(L"[DEBUG] ", L"Looking for child process window: " + notification_title);
+                write_log(L"[DEBUG] ", (L"Looking for child process window: " + notification_title).c_str());
                 HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
-                write_log(L"[DEBUG] ", L"hwndChild: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwndChild)));
+                write_log(L"[DEBUG] ", (L"hwndChild: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwndChild))).c_str());
                 
                 if (!hwndChild) {
                     write_log(L"[DEBUG] ", L"No child process found");
-                    write_log(L"[DEBUG] ", L"g_creatingProcess.load(): " + std::to_wstring(g_creatingProcess.load()));
+                    write_log(L"[DEBUG] ", (L"g_creatingProcess.load(): " + std::to_wstring(g_creatingProcess.load())).c_str());
                     
                     // Extract counter from command_line and increment
                     std::wstring commandLine = GetCommandLineW();
@@ -398,7 +398,7 @@ namespace local_push_connectivity {
                     }
                     
                     currentCount++; // Increment counter
-                    write_log(L"[DEBUG] ", L"Process creation count: " + std::to_wstring(currentCount) + L" $cout");
+                    write_log(L"[DEBUG] ", (L"Process creation count: " + std::to_wstring(currentCount) + L" $cout").c_str());
                     
                     if (currentCount >= 10) {
                         write_log(L"[ERROR] ", L"Maximum process creation limit reached (10), throwing error $cout");
@@ -417,7 +417,7 @@ namespace local_push_connectivity {
                     write_log(L"[Plugin] ", L"No child process found, creating new one");
                     g_creatingProcess.store(true);
                     auto status = LocalPushConnectivityPlugin::createBackgroundProcess(currentCount);
-                    write_log(L"[DEBUG] ", L"createBackgroundProcess returned: " + std::to_wstring(status));
+                    write_log(L"[DEBUG] ", (L"createBackgroundProcess returned: " + std::to_wstring(status)).c_str());
                     
                     if (status == -8) {
                         write_log(L"[DEBUG] ", L"Waiting for child process to be ready...");
@@ -583,9 +583,9 @@ namespace local_push_connectivity {
 
     int LocalPushConnectivityPlugin::createBackgroundProcess(int counter) {
         try {
-            write_log(L"[DEBUG] ", L"createBackgroundProcess called with counter: " + std::to_wstring(counter) + L" $cout");
+            write_log(L"[DEBUG] ", (L"createBackgroundProcess called with counter: " + std::to_wstring(counter) + L" $cout").c_str());
             auto oldPid = read_pid();
-            write_log(L"[DEBUG] ", L"oldPid: " + std::to_wstring(reinterpret_cast<uintptr_t>(oldPid)));
+            write_log(L"[DEBUG] ", (L"oldPid: " + std::to_wstring(reinterpret_cast<uintptr_t>(oldPid))).c_str());
             
             if (oldPid && IsWindow(oldPid)) {
                 write_log(L"[DEBUG] ", L"Old process still exists, killing it first");
@@ -621,11 +621,11 @@ namespace local_push_connectivity {
             std::wstring wideSettings = utf8_to_wide(m_settings);
             std::wstring commandLine = L"\"" + std::wstring(execuablePath) + L"\" child \"" + wideSettings + L"\" $cout:" + std::to_wstring(counter);
 
-            write_log(L"[DEBUG] ", L"Creating process with command: " + commandLine + L" $cout");
+            write_log(L"[DEBUG] ", (L"Creating process with command: " + commandLine + L" $cout").c_str());
             std::wcout << "exe service notification: " << commandLine << L"\n";
             if (CreateProcess(NULL, commandLine.data(), NULL, NULL,
                 FALSE, 0, NULL, NULL, &si, &pi)) {
-                write_log(L"[DEBUG] ", L"Process created successfully with PID: " + std::to_wstring(pi.dwProcessId) + L" $cout");
+                write_log(L"[DEBUG] ", (L"Process created successfully with PID: " + std::to_wstring(pi.dwProcessId) + L" $cout").c_str());
                 std::wcout << L"create process ok";
 
                 auto noti_title = utf8_to_wide(settings.title_notification);
@@ -670,7 +670,7 @@ namespace local_push_connectivity {
                 
                 // Tìm window theo class name (không phải window title)
                 HWND hwndChild = FindWindow(notification_title.c_str(), NULL);
-                write_log(L"[DEBUG] ", L"Found window: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwndChild)));
+                write_log(L"[DEBUG] ", (L"Found window: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwndChild))).c_str());
                 
                 if (hwndChild && IsWindow(hwndChild)) {
                     write_log(L"[DEBUG] ", L"Child process ready, sending settings $cout");
