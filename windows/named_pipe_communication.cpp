@@ -61,12 +61,16 @@ void NamedPipeServer::ServerLoop() {
         
         write_log(L"[NamedPipe] Server waiting for client connection", L"");
         
-        // Wait for client connection
+        // Wait for client connection with timeout
         BOOL connected = ConnectNamedPipe(hPipe, NULL);
         if (!connected) {
             DWORD error = GetLastError();
             if (error == ERROR_PIPE_CONNECTED) {
                 write_log(L"[NamedPipe] Client already connected");
+            } else if (error == ERROR_NO_DATA) {
+                write_log(L"[NamedPipe] No data available, closing pipe");
+                ClosePipe();
+                continue;
             } else {
                 write_log(L"[NamedPipe] ConnectNamedPipe failed: ", std::to_wstring(error).c_str());
                 ClosePipe();
@@ -154,9 +158,9 @@ bool NamedPipeClient::Connect() {
         return true; // Already connected
     }
     
-    // Wait for pipe to be available
+    // Wait for pipe to be available with reduced retries
     int retryCount = 0;
-    const int maxRetries = 50; // 5 seconds total
+    const int maxRetries = 3; // Reduce to 3 retries to avoid blocking
     
     while (retryCount < maxRetries) {
         hPipe = CreateFileW(
@@ -177,8 +181,11 @@ bool NamedPipeClient::Connect() {
         DWORD error = GetLastError();
         if (error == ERROR_PIPE_BUSY) {
             write_log(L"[NamedPipe] Pipe busy, retrying...");
-            Sleep(100);
+            Sleep(50); // Reduce sleep time
             retryCount++;
+        } else if (error == ERROR_FILE_NOT_FOUND) {
+            write_log(L"[NamedPipe] Pipe not found, server not ready");
+            break;
         } else {
             write_log(L"[NamedPipe] CreateFile failed: ", std::to_wstring(error).c_str());
             break;

@@ -376,7 +376,17 @@ namespace local_push_connectivity {
                 std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
                 NamedPipeClient testClient(pipeName);
                 
-                if (!testClient.Connect()) {
+                // Try to connect with timeout to avoid blocking
+                bool connected = false;
+                for (int i = 0; i < 3; i++) {
+                    if (testClient.Connect()) {
+                        connected = true;
+                        break;
+                    }
+                    Sleep(100); // Wait 100ms before retry
+                }
+                
+                if (!connected) {
                     write_log(L"[DEBUG] ", L"No child process found");
                     write_log(L"[DEBUG] ", (L"g_creatingProcess.load(): " + std::to_wstring(g_creatingProcess.load())).c_str());
                     
@@ -672,7 +682,17 @@ namespace local_push_connectivity {
                 std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
                 NamedPipeClient testClient(pipeName);
                 
-                if (testClient.Connect()) {
+                // Try to connect with timeout to avoid blocking
+                bool connected = false;
+                for (int i = 0; i < 3; i++) {
+                    if (testClient.Connect()) {
+                        connected = true;
+                        break;
+                    }
+                    Sleep(100); // Wait 100ms before retry
+                }
+                
+                if (connected) {
                     write_log(L"[DEBUG] ", L"Child process ready via Named Pipe, sending settings $cout");
                     write_log(L"[Plugin] ", L"Child process ready, sending settings");
                     LocalPushConnectivityPlugin::sendSettings();
