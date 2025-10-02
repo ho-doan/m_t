@@ -104,7 +104,7 @@ namespace local_push_connectivity {
                 ackMsg.server_time = getCurrentTimeMs();
                 
                 std::string ackJson = toJson(ackMsg);
-                std::wstring pipeName = GetPipeName(utf8_to_wide(LocalPushConnectivityPlugin::gSetting().title));
+                std::wstring pipeName = GetPipeName(utf8_to_wide(LocalPushConnectivityPlugin::_settings.title));
                 NamedPipeClient client(pipeName);
                 
                 if (client.Connect()) {
@@ -261,7 +261,7 @@ namespace local_push_connectivity {
                 // Create SET_URL message (matching diagram)
                 SetUrlMessage setUrlMsg;
                 setUrlMsg.id = "m1"; // Message ID
-                setUrlMsg.url = settings.uri();
+                setUrlMsg.url = wide_to_utf8(settings.uri());
                 setUrlMsg.opts = "{}"; // Empty options for now
                 
                 std::string setUrlJson = toJson(setUrlMsg);
