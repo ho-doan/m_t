@@ -31,22 +31,29 @@ class _IPCAppState extends State<IPCApp> {
   }
 
   Future<void> _startIPC() async {
+    print('Starting IPC system...');
     final success = await _plugin.startIPC();
+    print('IPC start result: $success');
+
     if (success) {
       setState(() {
         _isRunning = true;
       });
+      print('IPC system started successfully');
 
       // Start polling for numbers from child
       _timer = Timer.periodic(Duration(seconds: 1), (timer) {
         if (_plugin.isNumberReady()) {
           final number = _plugin.getCurrentNumber();
+          print('Received number from child: $number');
           setState(() {
             _currentNumber = number;
           });
           _plugin.resetNumberReady();
         }
       });
+    } else {
+      print('Failed to start IPC system');
     }
   }
 
@@ -69,6 +76,7 @@ class _IPCAppState extends State<IPCApp> {
 
   @override
   Widget build(BuildContext context) {
+    print('Building IPC App - _isRunning: $_isRunning');
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -264,7 +272,7 @@ class _IPCAppState extends State<IPCApp> {
                         elevation: 3,
                       ),
                     ),
-
+                    
                     // Stop Button
                     ElevatedButton.icon(
                       onPressed: _isRunning ? _stopIPC : null,
@@ -284,6 +292,21 @@ class _IPCAppState extends State<IPCApp> {
                       ),
                     ),
                   ],
+                ),
+                SizedBox(height: 20),
+                
+                // Debug Button
+                ElevatedButton(
+                  onPressed: () {
+                    print('Debug - _isRunning: $_isRunning');
+                    print('Debug - _currentNumber: $_currentNumber');
+                    print('Debug - _sentNumber: $_sentNumber');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('Debug Status'),
                 ),
                 SizedBox(height: 30),
 

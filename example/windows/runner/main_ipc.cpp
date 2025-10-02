@@ -78,10 +78,13 @@ private:
             );
             
             if (hPipe == INVALID_HANDLE_VALUE) {
-                log(L"Failed to create pipe");
+                DWORD error = GetLastError();
+                log(L"Failed to create pipe, error: " + std::to_wstring(error));
                 Sleep(1000);
                 continue;
             }
+            
+            log(L"Pipe created successfully");
             
             log(L"Parent server waiting for child...");
             
@@ -259,7 +262,14 @@ extern "C" {
     
     __declspec(dllexport) bool FlutterIPC_Start() {
         log(L"Flutter: Starting IPC system");
-        RunParent();
+        
+        // Start IPC system in background thread
+        std::thread ipcThread([]() {
+            RunParent();
+        });
+        ipcThread.detach();
+        
+        log(L"Flutter: IPC system started in background thread");
         return true;
     }
     
