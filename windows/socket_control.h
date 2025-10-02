@@ -110,15 +110,23 @@ struct WebSocketControl
     }
 
     void _reveive(std::wstring msg) {
-        // Try to send message to parent process via Named Pipe
+        // Try to send SOCKET_EVENT message to parent process via Named Pipe
         std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
         NamedPipeClient pipeClient(pipeName);
         
         if (pipeClient.Connect()) {
-            std::string msgUtf8 = wide_to_utf8(msg);
-            PipeMessage message(1, msgUtf8); // Command 1 for message
+            // Create SOCKET_EVENT message (matching diagram)
+            SocketEventMessage socketEventMsg;
+            socketEventMsg.event = "MESSAGE";
+            socketEventMsg.payload = wide_to_utf8(msg);
+            socketEventMsg.id = "e1"; // Event ID
+            
+            std::string eventJson = toJson(socketEventMsg);
+            PipeMessage message(PROTOCOL_SOCKET_EVENT, eventJson);
+            
             if (pipeClient.SendMessage(message)) {
                 write_log(L"[App Actived]", msg);
+                write_log(L"[DEBUG] ", (L"SOCKET_EVENT JSON: " + eventJson).c_str());
                 return;
             }
         }
@@ -319,6 +327,37 @@ inline std::unique_ptr<NamedPipeServer> g_pipeServer;
 inline void HandlePipeMessage(const PipeMessage& message) {
     try {
         switch (message.command) {
+        case PROTOCOL_SET_URL: {
+            write_log(L"[Service] receive SET_URL: ", utf8_to_wide(message.data).c_str());
+            
+            // Parse SET_URL message and update settings
+            auto settings = pluginSettingsFromJson(message.data);
+            if (m_control) {
+                m_control->updateSettings(settings);
+                
+                // Send ACK response (matching diagram)
+                AckMessage ackMsg;
+                ackMsg.id = "m1"; // Same ID as SET_URL
+                ackMsg.status = "OK";
+                
+                std::string ackJson = toJson(ackMsg);
+                std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+                NamedPipeClient client(pipeName);
+                
+                if (client.Connect()) {
+                    PipeMessage ackMessage(PROTOCOL_ACK, ackJson);
+                    if (client.SendMessage(ackMessage)) {
+                        write_log(L"[Service] ", L"ACK sent to parent via Named Pipe");
+                        write_log(L"[DEBUG] ", (L"ACK JSON: " + ackJson).c_str());
+                    }
+                    client.Disconnect();
+                }
+            }
+            else {
+                write_log(L"[Service] control is null!", L"");
+            }
+            break;
+        }
         case CMD_UPDATE_SETTINGS: {
             write_log(L"[Service] receive settings: ", utf8_to_wide(message.data).c_str());
             

@@ -45,12 +45,20 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 	write_log(L"[Plugin] ", L"Named Pipe mode - skipping hidden window");
 	write_pid(hwnd); // Still save PID for WM_COPYDATA fallback
 
-    // Child process does not need Named Pipe server
-    // It only connects to parent pipe to send PONG
-    write_log(L"[DEBUG] ", L"Child process - no Named Pipe server needed");
+    // Start Named Pipe server for child process to receive settings from parent
+    std::wstring childPipeName = GetPipeName(utf8_to_wide(param->title)) + L"_child";
+    write_log(L"[DEBUG] ", (L"Child process pipe name: " + childPipeName).c_str());
+    g_pipeServer = std::make_unique<NamedPipeServer>(childPipeName);
     
-    // Send "child ready" message to parent via Named Pipe
-    std::wstring testMsg = L"child ready";
+    if (g_pipeServer->Start(HandlePipeMessage)) {
+        write_log(L"[DEBUG] ", L"Child Named Pipe server started successfully");
+        write_log(L"[Plugin] ", L"Named Pipe server started");
+    } else {
+        write_log(L"[DEBUG] ", L"Failed to start child Named Pipe server");
+        write_log(L"[Plugin] ", L"Failed to start Named Pipe server");
+    }
+    
+    // Send HELLO message to parent via Named Pipe (matching diagram)
     std::wstring parentPipeName = GetPipeName(utf8_to_wide(param->title));
     NamedPipeClient parentClient(parentPipeName);
     
@@ -59,15 +67,23 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
     
     write_log(L"[DEBUG] ", (L"Attempting to connect to parent pipe: " + parentPipeName).c_str());
     if (parentClient.Connect()) {
-        write_log(L"[DEBUG] ", L"Connected to parent pipe, sending ready message");
-        std::string msgUtf8 = wide_to_utf8(testMsg);
-        PipeMessage message(PONG, msgUtf8);
+        write_log(L"[DEBUG] ", L"Connected to parent pipe, sending HELLO message");
+        
+        // Create HELLO message (matching diagram)
+        HelloMessage helloMsg;
+        helloMsg.pid = GetCurrentProcessId();
+        helloMsg.version = "1.0";
+        
+        std::string helloJson = toJson(helloMsg);
+        PipeMessage message(PROTOCOL_HELLO, helloJson);
+        
         if (parentClient.SendMessage(message)) {
-            write_log(L"[DEBUG] ", L"Ready message sent to parent via Named Pipe");
-            write_log(L"[Plugin] ", L"sent ready message to parent via Named Pipe");
+            write_log(L"[DEBUG] ", L"HELLO message sent to parent via Named Pipe");
+            write_log(L"[Plugin] ", L"sent HELLO message to parent via Named Pipe");
+            write_log(L"[DEBUG] ", (L"HELLO JSON: " + helloJson).c_str());
         } else {
-            write_log(L"[DEBUG] ", L"Failed to send ready message via Named Pipe");
-            write_log(L"[Plugin] ", L"failed to send ready message via Named Pipe");
+            write_log(L"[DEBUG] ", L"Failed to send HELLO message via Named Pipe");
+            write_log(L"[Plugin] ", L"failed to send HELLO message via Named Pipe");
         }
     } else {
         write_log(L"[DEBUG] ", L"Failed to connect to parent via Named Pipe");

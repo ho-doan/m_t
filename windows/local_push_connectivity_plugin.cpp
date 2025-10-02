@@ -94,6 +94,36 @@ namespace local_push_connectivity {
     void HandleParentPipeMessage(const PipeMessage& message) {
         try {
             switch (message.command) {
+            case PROTOCOL_HELLO: {
+                write_log(L"[Plugin] ", L"Received HELLO from child process via Named Pipe");
+                write_log(L"[DEBUG] ", (L"HELLO JSON: " + message.data).c_str());
+                
+                // Send HELLO_ACK response (matching diagram)
+                HelloAckMessage ackMsg;
+                ackMsg.ok = true;
+                ackMsg.server_time = getCurrentTimeMs();
+                
+                std::string ackJson = toJson(ackMsg);
+                std::wstring pipeName = GetPipeName(utf8_to_wide(gSetting().title));
+                NamedPipeClient client(pipeName);
+                
+                if (client.Connect()) {
+                    PipeMessage ackMessage(PROTOCOL_HELLO_ACK, ackJson);
+                    if (client.SendMessage(ackMessage)) {
+                        write_log(L"[Plugin] ", L"HELLO_ACK sent to child via Named Pipe");
+                        write_log(L"[DEBUG] ", (L"HELLO_ACK JSON: " + ackJson).c_str());
+                    }
+                    client.Disconnect();
+                }
+                
+                if (_result) {
+                    // Gửi settings ngay sau khi nhận được HELLO
+                    LocalPushConnectivityPlugin::sendSettings();
+                    _result(true);
+                    _result = NULL;
+                }
+                break;
+            }
             case PONG: {
                 if (_result) {
                     write_log(L"[Plugin] ", L"Received PONG from child process via Named Pipe");
@@ -111,18 +141,40 @@ namespace local_push_connectivity {
                 write_log(L"[Plugin] ", L"WARNING: Child sent UPDATE_SETTINGS to parent - this is unexpected");
                 break;
             }
-            case 1: { // Message from child
+            case PROTOCOL_SOCKET_EVENT: {
+                write_log(L"[Plugin] ", L"Received SOCKET_EVENT from child via Named Pipe");
+                write_log(L"[DEBUG] ", (L"SOCKET_EVENT JSON: " + message.data).c_str());
+                
                 if (LocalPushConnectivityPlugin::_flutterApi) {
                     NotificationPigeon n = NotificationPigeon("n", "n");
                     MessageResponsePigeon mR = MessageResponsePigeon(n, message.data);
                     MessageSystemPigeon m = MessageSystemPigeon(false, mR);
                     LocalPushConnectivityPlugin::_flutterApi->OnMessage(m,
                         []() {
-                            std::cout << "Message sent ok";
+                            write_log(L"[Plugin] ", L"Message sent ok");
                         },
                         [](const FlutterError& e) {
-                            std::cout << "Message send error: " << e.code()
-                                << " - " << e.message();
+                            write_log(L"[Plugin] ", (L"Message send error: " + utf8_to_wide(e.code()) + L" - " + utf8_to_wide(e.message())).c_str());
+                        });
+                }
+                break;
+            }
+            case PROTOCOL_PONG: {
+                write_log(L"[Plugin] ", L"Received PONG from child via Named Pipe");
+                write_log(L"[DEBUG] ", (L"PONG JSON: " + message.data).c_str());
+                break;
+            }
+            case 1: { // Legacy message from child (backward compatibility)
+                if (LocalPushConnectivityPlugin::_flutterApi) {
+                    NotificationPigeon n = NotificationPigeon("n", "n");
+                    MessageResponsePigeon mR = MessageResponsePigeon(n, message.data);
+                    MessageSystemPigeon m = MessageSystemPigeon(false, mR);
+                    LocalPushConnectivityPlugin::_flutterApi->OnMessage(m,
+                        []() {
+                            write_log(L"[Plugin] ", L"Message sent ok");
+                        },
+                        [](const FlutterError& e) {
+                            write_log(L"[Plugin] ", (L"Message send error: " + utf8_to_wide(e.code()) + L" - " + utf8_to_wide(e.message())).c_str());
                         });
                 }
                 break;
@@ -190,10 +242,9 @@ namespace local_push_connectivity {
     void LocalPushConnectivityPlugin::sendSettings() {
         try {
             PluginSetting settings = gSetting();
-            std::string commandLine = pluginSettingsToJson(settings);
             
-            // Try Named Pipe first
-            std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title));
+            // Try Named Pipe first - connect to child pipe
+            std::wstring pipeName = GetPipeName(utf8_to_wide(settings.title)) + L"_child";
             NamedPipeClient client(pipeName);
             
             // Try to connect with timeout to avoid blocking
@@ -207,13 +258,22 @@ namespace local_push_connectivity {
             }
             
             if (connected) {
-                PipeMessage message(PIPE_CMD_UPDATE_SETTINGS, commandLine);
+                // Create SET_URL message (matching diagram)
+                SetUrlMessage setUrlMsg;
+                setUrlMsg.id = "m1"; // Message ID
+                setUrlMsg.url = settings.uri;
+                setUrlMsg.opts = "{}"; // Empty options for now
+                
+                std::string setUrlJson = toJson(setUrlMsg);
+                PipeMessage message(PROTOCOL_SET_URL, setUrlJson);
+                
                 if (client.SendMessage(message)) {
-                    write_log(L"[SETTINGS] ", L"Sent via Named Pipe");
+                    write_log(L"[SETTINGS] ", L"SET_URL sent via Named Pipe");
+                    write_log(L"[DEBUG] ", (L"SET_URL JSON: " + setUrlJson).c_str());
                     client.Disconnect();
                     return;
                 } else {
-                    write_log(L"[SETTINGS] ", L"Failed to send via Named Pipe");
+                    write_log(L"[SETTINGS] ", L"Failed to send SET_URL via Named Pipe");
                 }
                 client.Disconnect();
             } else {
