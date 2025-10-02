@@ -31,49 +31,6 @@ scope_exit<F> make_scope_exit(F f) {
 // Global list giữ lifetime cho class names đã đăng ký
 inline std::list<std::wstring> g_registeredClasses;
 
-inline HWND createHiddenWindow(HINSTANCE hInstance, const std::wstring& className) {
-	try {
-		WNDCLASSW wc = { 0 };
-		wc.lpfnWndProc = CtlHiddenWndProc;
-		wc.hInstance = hInstance;
-		
-		wc.lpszClassName = className.c_str();
-
-		write_log(className);
-
-		if (!RegisterClassW(&wc)) {
-			DWORD err = GetLastError();
-			if (err != ERROR_CLASS_ALREADY_EXISTS) {
-				write_log(L"RegisterClassW failed");
-				return NULL;
-			}
-		}
-
-		HWND hwnd = CreateWindowExW(
-			0,
-			className.c_str(),
-			className.c_str(), // window title
-			0, 0, 0, 0, 0,
-			HWND_MESSAGE, NULL, hInstance, NULL
-		);
-
-		if (hwnd == NULL) {
-			write_log(L"Create windowExW failed");
-			return NULL;
-		}
-		write_log(L"create window successfully");
-		return hwnd;
-	}
-	catch (const std::exception& ex) {
-		write_error(ex, 193);
-		return NULL;
-	}
-	catch (...) {
-		write_error();
-		return NULL;
-	}
-}
-
 inline constexpr wchar_t NOTIFICATION_SERVICE[] = L"_notification";
 
 static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
@@ -86,15 +43,12 @@ static DWORD WINAPI ThreadFunction(LPVOID lpParam) {
 	g_registeredClasses.push_back(notification_title_);
 	const std::wstring& classNameRef = g_registeredClasses.back();
 
-	HWND hwnd = createHiddenWindow(GetModuleHandle(NULL), classNameRef);
-	if (hwnd == NULL) {
-		write_log(L"[DEBUG] ", L"Failed to create hidden window");
-		write_log(L"[Plugin] ", L"create hidden failed");
-		return 1;
-	}
-	write_log(L"[DEBUG] ", (L"Hidden window created successfully: " + std::to_wstring(reinterpret_cast<uintptr_t>(hwnd))).c_str());
-	write_log(L"[Plugin] ", L"created hidden window");
-	write_pid(hwnd);
+	// No need for hidden window with Named Pipe communication
+	// Just create a dummy HWND for PID tracking (backward compatibility)
+	HWND hwnd = (HWND)0x12345678; // Dummy handle for compatibility
+	write_log(L"[DEBUG] ", L"Using Named Pipe communication - no hidden window needed");
+	write_log(L"[Plugin] ", L"Named Pipe mode - skipping hidden window");
+	write_pid(hwnd); // Still save PID for WM_COPYDATA fallback
 
     // Start Named Pipe server for child process
     std::wstring pipeName = GetPipeName(utf8_to_wide(param->title));
