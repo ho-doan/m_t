@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:local_push_connectivity/local_push_connectivity.dart';
 import 'timer_app.dart';
 import 'ipc_app.dart';
+import 'simple_ipc_test.dart';
 
 class MyHttpOverrides extends HttpOverrides {
   @override
@@ -77,6 +78,7 @@ class _MyAppState extends State<MyApp> {
     const MainPage(),
     const TimerApp(),
     const IPCApp(),
+    const SimpleIPCTest(),
   ];
 
   @override
@@ -149,6 +151,10 @@ class _MyAppState extends State<MyApp> {
             BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Main'),
             BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'Timer'),
             BottomNavigationBarItem(icon: Icon(Icons.sync), label: 'IPC'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.bug_report),
+              label: 'Test',
+            ),
           ],
         ),
       ),

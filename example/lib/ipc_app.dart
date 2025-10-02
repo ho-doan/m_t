@@ -272,7 +272,7 @@ class _IPCAppState extends State<IPCApp> {
                         elevation: 3,
                       ),
                     ),
-                    
+
                     // Stop Button
                     ElevatedButton.icon(
                       onPressed: _isRunning ? _stopIPC : null,
@@ -294,7 +294,7 @@ class _IPCAppState extends State<IPCApp> {
                   ],
                 ),
                 SizedBox(height: 20),
-                
+
                 // Debug Button
                 ElevatedButton(
                   onPressed: () {
